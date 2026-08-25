@@ -8,7 +8,7 @@ and produces market-anchored win probabilities, fair prices and value flags.
 |---|---|---|---|
 | GreyhoundPredictor | `greyhound` | `app.py` | ✅ live |
 | **HorsePredictor** | `horse` | `app.py` | ✅ live |
-| HarnessPredictor | `harness` | — | planned |
+| **HarnessPredict** | `harness` | `app.py` | ✅ live |
 
 ## Files
 
