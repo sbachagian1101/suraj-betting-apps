@@ -141,10 +141,94 @@ def _summary_segment_clean(raw: str) -> str:
     return ""
 
 
+_PRICE_CELL = re.compile(r"^\$?(\d+(?:\.\d+)?)$")
+_NAME_HEADERS = ("runner", "greyhound", "dog")
+
+
+def _split_row(line: str) -> list[str]:
+    """Split a field-table row, keeping empty cells so column positions survive."""
+    if "	" in line:
+        return [p.strip() for p in line.split("	")]
+    return [p.strip() for p in re.split(r"\s{2,}", line)]
+
+
+def _summary_header_map(cells: list[str]) -> dict[str, Any] | None:
+    """Locate the columns of a `Tab | Runner | ... | Trainer | ...` header row.
+
+    R&S serve several column sets for the same Enhanced Form page: some carry a
+    WT column, others drop it and carry prizemoney and bookmaker columns
+    instead.  Columns are therefore found by header label, never by position.
+    """
+    low = [c.strip().lower() for c in cells]
+    if len(low) < 3 or low[0] != "tab":
+        return None
+    name = next((i for i, c in enumerate(low) if c in _NAME_HEADERS), None)
+    if name is None:
+        return None
+    return {
+        "name": name,
+        "trainer": next((i for i, c in enumerate(low) if c == "trainer"), None),
+        "wt": next((i for i, c in enumerate(low) if c in ("wt", "weight")), None),
+    }
+
+
+def _parse_summary_header_driven(t: str) -> list[dict[str, Any]]:
+    """Read the field table using its own header row.
+
+    A row only needs a tab number and a name to produce a runner; weight,
+    trainer and price are best-effort.  Nothing is dropped for a missing
+    optional column, which is what previously discarded whole runners.
+    """
+    out: list[dict[str, Any]] = []
+    colmap: dict[str, Any] | None = None
+    for line in t.splitlines():
+        cells = _split_row(line)
+        if colmap is None:
+            colmap = _summary_header_map(cells)
+            continue
+        if not cells or not re.fullmatch(r"\d{1,2}", cells[0]):
+            continue
+        tab = int(cells[0])
+        name_idx = colmap["name"]
+        name = _clean_name(cells[name_idx]) if name_idx < len(cells) else ""
+        if not 1 <= tab <= 10 or not re.search(r"[A-Za-z]", name):
+            continue
+
+        def cell(idx: int | None) -> str:
+            return cells[idx] if idx is not None and idx < len(cells) else ""
+
+        scratch = any(re.fullmatch(r"scr(atched)?", c, re.I) for c in cells)
+        # The price is the right-most plain number. Prizemoney cells ("$45.5k")
+        # and trainer names cannot match, so this is safe on every column set.
+        odds = 999.0
+        after = (colmap["trainer"] if colmap["trainer"] is not None else name_idx) + 1
+        for c in reversed(cells[after:]):
+            m = _PRICE_CELL.match(c)
+            if m:
+                odds = _f(m.group(1), 999.0)
+                break
+        runner: dict[str, Any] = {
+            "tab": tab,
+            "box": tab if tab <= 8 else 0,
+            "horse": name,
+            "trainer": _clean_name(cell(colmap["trainer"])),
+            "scratched": scratch,
+            "tab_odds": 999.0 if scratch else odds,
+        }
+        wt = cell(colmap["wt"])
+        if wt:
+            runner["weight"] = _f(wt)
+        out.append(runner)
+    return out
+
+
 def _parse_summary_plain(raw: str) -> list[dict[str, Any]]:
     """Fallback for direct browser clipboard text."""
     t = _clean_md(raw)
-    out: list[dict[str, Any]] = []
+    out = _parse_summary_header_driven(t)
+    if out:
+        return out
+    out = []
 
     for line in t.splitlines():
         if "\t" in line:
@@ -267,7 +351,7 @@ def _detail_header_matches(
 # Form figures line followed by a market line. The price may be a bare number,
 # "$22", or bookmaker-prefixed as copied from the live page: "betfair$22" / "Tab$4.2".
 _FORM_PRICE = re.compile(
-    r"(?mi)^\s*([fFxX0-9]{3,10})\s*$\s*^\s*(?:betfair|tab)?\s*\$?\s*([0-9]+(?:\.[0-9]+)?)\s*$"
+    r"(?mi)^\s*([fFxX0-9]{3,10})\s*$\s*^\s*(betfair|tab)?\s*\$?\s*([0-9]+(?:\.[0-9]+)?)\s*$"
 )
 
 
@@ -498,7 +582,14 @@ def _parse_block(block: str, runner: dict[str, Any]) -> dict[str, Any]:
     pair = _FORM_PRICE.search(head) or _FORM_PRICE.search(block[:400])
     if pair:
         d["form"] = pair.group(1).lower()
-        d["bf_odds"] = _f(pair.group(2), 999.0)
+        price = _f(pair.group(3), 999.0)
+        if (pair.group(2) or "").lower() == "tab":
+            # R&S show a TAB price when the runner has no Betfair market. Do not
+            # file it as a Betfair price; `parse` mirrors it into bf_odds later.
+            if _f(runner.get("tab_odds"), 999.0) >= 999.0:
+                d["tab_odds"] = price
+        else:
+            d["bf_odds"] = price
 
     m = re.search(
         rf"(?mi)^\s*{re.escape(runner['horse'])}\s+(\d+)yo\s+([A-Z/ ]+?)\s+([A-Z])\s*$",
@@ -609,6 +700,14 @@ def parse(raw: str) -> tuple[dict[str, Any], list[dict[str, Any]], list[str]]:
     active = [r for r in runners if not r.get("scratched")]
     if any(r.get("box", 0) == 0 for r in active):
         warnings.append("One or more active reserves could not be assigned to a vacant box.")
+    parsed_tabs = {r["tab"] for r in runners}
+    gaps = sorted(set(range(1, max(parsed_tabs) + 1)) - parsed_tabs) if parsed_tabs else []
+    if gaps:
+        warnings.append(
+            "Tab number(s) "
+            + ", ".join(str(g) for g in gaps)
+            + " are missing from the parsed field - the field table may not have been read in full."
+        )
     missing_detail = [r for r in active if r["tab"] not in blocks]
     if missing_detail:
         warnings.append(f"Detailed form was not parsed for {len(missing_detail)} active runner(s).")
