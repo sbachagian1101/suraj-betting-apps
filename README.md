@@ -5,7 +5,7 @@ Personal suite of quantitative racing prediction apps.
 | App | Branch | Entry point | Status |
 |---|---|---|---|
 | **GreyhoundPredictor** | `greyhound` | `app.py` | ✅ live |
-| HorsePredictor (thoroughbred) | `horse` | — | planned |
+| **HorsePredictor** (thoroughbred) | `horse` | `app.py` | ✅ live |
 | HarnessPredictor | `harness` | — | planned |
 
 ## GreyhoundPredictor
