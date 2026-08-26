@@ -84,13 +84,32 @@ scoring the model against a real Wolverhampton card — six races, 16 placegette
 
 | Rule | Why |
 |---|---|
-| **Shortlist the top 5**, not the top 3 | Placegetters come from deeper than winners. Top 3 caught 37.5% of them; top 5 caught **75%** |
+| **Require the market to agree** — model top 5 ∩ market top 3 | The biggest single lift: precision **33.3% → 47.1%** at the same ~3 picks per race |
+| **Cap at 3 selections** | A shortlist you can actually bet. Overflow is shown as a reserve, not dropped |
 | **Exclude F/M ≥ 2.0×** | Horses the form model rates at twice the market's opinion placed **1 time in 20** |
 | **Use the right place count** | `Top3%` is a *top-three* number. Fields of 5–7 pay only two places, so the app switches to `Top2%` automatically |
 | **Shrink toward the base rate** | Observed place rates ran *above* the model in its low band and *below* it in its high band. A shrink toward `places / runners` corrects both tails at once |
 
-Rows are colour-coded — 🟩 qualifies, 🟨 excluded by the F/M filter, ⬜ outside
-the shortlist — and every threshold is adjustable in the sidebar.
+### Why consensus rather than a shorter model list
+
+Measured on the Wolverhampton card, precision per selection was:
+
+| Rule | Precision | Picks/race |
+|---|---|---|
+| Model top 3 | 33.3% | 3.0 |
+| Model top 5 | 40.0% | 5.0 |
+| Market top 3 | 44.4% | 3.0 |
+| **Model top 5 ∩ market top 3, F/M < 2** | **47.1%** | **2.8** |
+
+Simply cutting the model's list from 5 to 3 made it *worse*, because the model's
+ordering inside its own top 5 is close to noise — its 4th and 5th picks placed as
+often as its 2nd and 3rd. The market supplies the discrimination the model lacks,
+so the app keeps a wide model pool and lets the market choose from it.
+
+Rows are colour-coded — 🟩 selection, 🟦 reserve, 🟨 excluded (market or F/M),
+⬜ outside the model shortlist — and every threshold is adjustable in the sidebar.
+Set "Market must rate inside its top" to the field size to switch the consensus
+gate off entirely.
 
 **Fair place $ = 1 ÷ adjusted place probability.** Enter actual place odds as
 `tab:price` pairs and the table shows the edge on each.
@@ -137,7 +156,7 @@ behaviour, the F/M exclusion and the odds maths:
 python test_place_finder.py
 ```
 
-Expect `PASS 35  FAIL 0`.
+Expect `PASS 51  FAIL 0`.
 
 ## Deploy (Streamlit Community Cloud)
 

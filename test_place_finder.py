@@ -125,6 +125,50 @@ def main():
            abs(float(generous.iloc[0]["Place edge"]) - (p_adj * 10.0 - 1)) < 1e-6)
     c.true("no odds column when none supplied", "Place edge" not in table.columns)
 
+    # ---- market consensus gate and cap ------------------------------------
+    mr = pf.market_rank(active)
+    c.true("market ranks are a permutation of 1..n",
+           sorted(mr.tolist()) == list(range(1, n + 1)))
+    prices = [float(r.get("bf_odds") or 999.0) for r in active]
+    c.check("market rank 1 is the shortest price",
+            int(np.argmin(prices)), int(np.argmin(mr)))
+    unpriced = [dict(r) for r in active]
+    unpriced[0]["bf_odds"] = 999.0
+    unpriced[0]["tab_odds"] = 999.0
+    c.true("an unpriced runner sorts last",
+           pf.market_rank(unpriced)[0] == n)
+
+    tbl, mt = pf.build(active, res)
+    c.true("default settings never exceed the cap", mt["qualifiers"] <= pf.DEFAULT_MAX_PICKS)
+    c.true("selections are a subset of the model shortlist",
+           bool((tbl[tbl["Status"] == pf.STATUS_QUALIFY]["Rank"] <= pf.DEFAULT_TOP_N).all()))
+    c.true("every selection is inside the market top group",
+           bool((tbl[tbl["Status"] == pf.STATUS_QUALIFY]["Mkt rank"]
+                 <= pf.DEFAULT_MARKET_TOP).all()))
+    c.true("market exclusions really are outside the market top group",
+           bool((tbl[tbl["Status"] == pf.STATUS_MARKET]["Mkt rank"]
+                 > pf.DEFAULT_MARKET_TOP).all()))
+
+    for cap in (1, 2, 3):
+        _, mc = pf.build(active, res, max_picks=cap)
+        c.check(f"cap {cap} honoured", mc["qualifiers"] <= cap, True)
+    wide, mw = pf.build(active, res, market_top=n, max_picks=99)
+    c.check("market gate off restores the full shortlist",
+            mw["qualifiers"], pf.DEFAULT_TOP_N)
+    c.check("market gate off excludes nobody on market grounds",
+            mw["market_excluded"], 0)
+    tight, mtg = pf.build(active, res, market_top=1, max_picks=99)
+    c.check("market_top=1 leaves at most one selection", mtg["qualifiers"] <= 1, True)
+
+    capped, mcap = pf.build(active, res, market_top=n, max_picks=2)
+    c.check("overflow becomes reserves, not exclusions",
+            mcap["reserves"], pf.DEFAULT_TOP_N - 2)
+    c.true("reserves rank below every selection",
+           (capped[capped["Status"] == pf.STATUS_RESERVE]["Rank"].min()
+            > capped[capped["Status"] == pf.STATUS_QUALIFY]["Rank"].max()))
+    c.true("summary reports the selection count",
+           f"{mt['qualifiers']} selection(s)" in pf.summary_line(mt))
+
     # ---- styling must not crash and must colour every row -----------------
     styled = pf.style(table)
     c.true("styler renders", styled.to_html() is not None)

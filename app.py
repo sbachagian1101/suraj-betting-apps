@@ -119,10 +119,20 @@ with st.sidebar:
     seed = st.number_input("Random seed", value=42, step=1)
     st.divider()
     st.subheader("Place Finder criteria")
+    place_max = st.slider(
+        "Maximum selections", 1, 5, pf.DEFAULT_MAX_PICKS, 1,
+        help="Hard cap on how many horses are flagged. Anything that passes every "
+             "filter beyond the cap is shown as a reserve.")
+    place_market_top = st.slider(
+        "Market must rate inside its top", 1, 6, pf.DEFAULT_MARKET_TOP, 1,
+        help="The biggest single lift. Requiring the market to agree raised "
+             "precision from 33.3% (model top 3 alone) to 47.1% at the same ~3 "
+             "picks per race. Set to the field size to switch this off.")
     place_top_n = st.slider(
-        "Shortlist size (top N by model rank)", 3, 8, pf.DEFAULT_TOP_N, 1,
-        help="Placegetters come from deeper than winners. On the Wolverhampton card "
-             "the top 3 caught 37.5% of placegetters; the top 5 caught 75%.")
+        "Model shortlist to draw from", 3, 8, pf.DEFAULT_TOP_N, 1,
+        help="The pool the consensus is taken from. The model's ordering inside "
+             "its own top 5 proved close to noise, so widening this and letting "
+             "the market choose beat narrowing it.")
     place_fm_max = st.slider(
         "Exclude F/M at or above", 1.0, 5.0, pf.DEFAULT_FM_MAX, 0.1,
         help="Horses the form model rates far above the market. On that card, "
@@ -280,6 +290,8 @@ with place_tab:
             st.warning("Could not read any `tab:price` pairs from that text.")
 
         table, meta = pf.build(active, result, top_n=int(place_top_n),
+                               market_top=int(place_market_top),
+                               max_picks=int(place_max),
                                fm_max=float(place_fm_max), shrink=float(place_shrink),
                                places=int(places), place_odds=place_odds or None)
         if meta["no_place_market"]:
@@ -293,24 +305,30 @@ with place_tab:
                 f'#{int(row["Tab"])} {row["Horse"]} ({row["Place% (adj)"]:.1f}%)'
                 for _, row in picks.iterrows())
             st.markdown(
-                f'<div class="pick"><div class="muted">PLACE SHORTLIST</div>'
+                f'<div class="pick"><div class="muted">PLACE SELECTIONS</div>'
                 f'<div style="font-size:1.05rem;margin-top:.3rem">{names}</div></div>',
                 unsafe_allow_html=True)
         else:
-            st.info("No runner met all the criteria in this race.")
+            st.info("No runner met all the criteria in this race. That is a real "
+                    "answer, not a failure - a race where the model and the market "
+                    "disagree is one to leave alone.")
 
         st.dataframe(pf.style(table), width="stretch", hide_index=True)
         st.caption(
-            "🟩 **QUALIFIES** — inside the shortlist and past the F/M filter.  "
-            "🟨 **F/M filter** — well rated by the form model but far above the "
-            "market's opinion; a trap for place purposes.  ⬜ outside the shortlist. "
+            "🟩 **SELECTION** — in the model's shortlist, rated inside the market's "
+            "top group, past the F/M filter, within the cap.  "
+            "🟦 **reserve** — passed everything but fell outside the cap.  "
+            "🟨 **excluded** — either the market does not rate it, or the form model "
+            "rates it far above the market (F/M), which was a trap for places.  "
+            "⬜ outside the model shortlist.  "
             "**Fair place $** is 1 ÷ adjusted place probability — only bet when the "
             "actual place market pays more than that.")
         st.warning(
             "These criteria were derived from **one meeting — six races, 16 "
-            "placegetters**. They are a sensible working method, not a proven edge. "
-            "On that same card the three shortest Betfair prices found more "
-            "placegetters than the model did.")
+            "placegetters**. Measured on that card the consensus rule hit "
+            "**47.1%** of its selections, against 33.3% for the model's own top 3 "
+            "and 44.4% for the market's top 3 alone. That is a sensible working "
+            "method, not a proven edge — the sample is far too small to be sure.")
         st.download_button(
             "Download place table as CSV",
             table.to_csv(index=False).encode("utf-8"),
