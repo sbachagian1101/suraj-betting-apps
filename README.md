@@ -17,9 +17,11 @@ and produces market-anchored win probabilities, fair prices and value flags.
 - `horse_model.py` — Shin de-vig → conditional-logit fundamentals → Benter
   blend → discounted Plackett–Luce finishing-order simulation.
 - `place_finder.py` — placegetter shortlist and criteria (see below).
+- `results_log.py` — results ledger, performance tracking and threshold tuner.
 - `app.py` — Streamlit UI.
 - `test_parser.py` + `tests_fixture_tamworth_r4.txt` — parser regression suite.
 - `test_place_finder.py` — Place Finder regression suite.
+- `test_results_log.py` — ledger and tuner regression suite.
 
 ## Parser design
 
@@ -129,6 +131,47 @@ shortest Betfair prices found **more** placegetters than the model did (6 of 16
 versus 4 of 16). Treat the shortlist as a starting point for pricing against the
 actual place market, not as a tip sheet.
 
+## Results & Tuning
+
+Log a prediction, enter the finishing order once the race is run, and the app
+tracks how the selections are actually doing. Two things it is careful about:
+
+**What can and cannot be learned from outcomes.** The model's feature weights
+were calibrated on roughly 1,700 races and **cannot** be moved by logging
+finishing positions — you would need the full feature vector for hundreds of
+races, and re-fitting on a few dozen would be worse than leaving them alone. The
+five Place Finder thresholds *can* be tuned, because those are the part currently
+resting on sixteen placegetters.
+
+**How much data that actually needs.** From a two-proportion power calculation at
+80% power:
+
+| Question you want answered | Races needed |
+|---|---|
+| Has a rule quietly broken (47% → 20%)? | **~17** |
+| Does it beat a dart throw? | ~45 |
+| Does consensus really beat model top-3? | ~71 |
+| Is 47% genuinely better than 40%? | **~273** |
+
+So the ledger earns its keep from race one by **monitoring**, while the tuner
+stays locked until 40 settled races. Below that it reports how far off it is
+rather than offering a suggestion nobody should take.
+
+When it does unlock, tuning is scored by **leave-one-race-out cross-validation** —
+thresholds chosen on the other races, then applied to the held-out one. Choosing
+and scoring on the same races would manufacture an edge that is not there, and
+the app shows the in-sample and cross-validated figures side by side so the gap
+between them (which *is* the over-fitting) is visible. If cross-validation does
+not beat the current defaults, it says so and tells you to leave them alone.
+
+Performance reporting includes a **95% confidence interval on the strike rate**,
+and warns explicitly when that interval still includes the base rate — that is,
+when the selections are not yet distinguishable from picking at random.
+
+> **Storage.** Streamlit Community Cloud wipes its filesystem on restart, so the
+> **download button is the real save**. Keep the ledger CSV and re-upload it next
+> session.
+
 ## Run locally
 
 ```bash
@@ -157,6 +200,18 @@ python test_place_finder.py
 ```
 
 Expect `PASS 51  FAIL 0`.
+
+The ledger and tuner have their own suite. Its most important check is that
+`results_log.selections_for_race` agrees exactly with `place_finder.build`: the
+ledger re-derives selections from stored columns so old races can be re-scored
+under new thresholds, and if those two ever drift apart every historic number
+silently becomes wrong.
+
+```bash
+python test_results_log.py
+```
+
+Expect `PASS 49  FAIL 0`.
 
 ## Deploy (Streamlit Community Cloud)
 

@@ -9,6 +9,7 @@ import streamlit as st
 import horse_model as model
 import horse_parser as parser
 import place_finder as pf
+import results_log as rl
 
 st.set_page_config(page_title="HorsePredictor", page_icon=":horse_racing:",
                    layout="wide", initial_sidebar_state="expanded")
@@ -149,9 +150,11 @@ with st.sidebar:
         "finish → freshness → R&S ratings.")
     st.caption("Prediction is probabilistic decision support, not a guaranteed outcome.")
 
-paste_tab, parsed_tab, pred_tab, place_tab, explain_tab, method_tab = st.tabs(
+paste_tab, parsed_tab, pred_tab, place_tab, results_tab, explain_tab, method_tab = st.tabs(
     ["1 · Paste Data", "2 · Parsed Data", "3 · Prediction", "4 · Place Finder",
-     "5 · Explanations", "Method"])
+     "5 · Results & Tuning", "6 · Explanations", "Method"])
+
+st.session_state.setdefault("ledger", rl.empty_ledger())
 
 with paste_tab:
     st.subheader("Paste the full Racing & Sports thoroughbred Enhanced Form page")
@@ -329,12 +332,176 @@ with place_tab:
             "**47.1%** of its selections, against 33.3% for the model's own top 3 "
             "and 44.4% for the market's top 3 alone. That is a sensible working "
             "method, not a proven edge — the sample is far too small to be sure.")
-        st.download_button(
-            "Download place table as CSV",
-            table.to_csv(index=False).encode("utf-8"),
-            file_name=f"{st.session_state['header'].get('track','race')}"
-                      f"_R{st.session_state['header'].get('race_no','')}_places.csv",
-            mime="text/csv")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.download_button(
+                "Download place table as CSV",
+                table.to_csv(index=False).encode("utf-8"),
+                file_name=f"{st.session_state['header'].get('track','race')}"
+                          f"_R{st.session_state['header'].get('race_no','')}_places.csv",
+                mime="text/csv", width="stretch")
+        with c2:
+            if st.button("📋 Log this race for results tracking", width="stretch"):
+                snap = rl.snapshot(st.session_state["header"], active, result, table, meta)
+                st.session_state["ledger"] = rl.merge(st.session_state["ledger"], snap)
+                st.success(f"Logged **{rl.race_id(st.session_state['header'])}**. "
+                           "Enter the finishing order in **5 · Results & Tuning** "
+                           "once the race is run.")
+
+with results_tab:
+    st.subheader("Results & Tuning")
+    ledger = st.session_state["ledger"]
+
+    with st.expander("Load or save your ledger", expanded=ledger.empty):
+        st.caption(
+            "Streamlit Cloud wipes its filesystem on every restart, so **the "
+            "download is the real save**. Keep the CSV and re-upload it next session.")
+        up = st.file_uploader("Upload a saved ledger CSV", type=["csv"], key="ledger_up")
+        if up is not None:
+            try:
+                loaded = pd.read_csv(up)
+                missing = [c for c in rl.LEDGER_COLUMNS if c not in loaded.columns]
+                if missing:
+                    st.error(f"That file is missing column(s): {', '.join(missing)}")
+                else:
+                    st.session_state["ledger"] = loaded[rl.LEDGER_COLUMNS]
+                    ledger = st.session_state["ledger"]
+                    st.success(f"Loaded {ledger['race_id'].nunique()} race(s), "
+                               f"{len(ledger)} runner rows.")
+            except Exception as exc:                       # noqa: BLE001
+                st.error(f"Could not read that CSV: {exc}")
+        if not ledger.empty:
+            st.download_button(
+                "💾 Download ledger CSV", ledger.to_csv(index=False).encode("utf-8"),
+                file_name="horsepredictor_ledger.csv", mime="text/csv",
+                width="stretch")
+
+    if ledger.empty:
+        st.info("Nothing logged yet. Run a prediction, open **4 · Place Finder**, "
+                "and press **Log this race for results tracking**.")
+    else:
+        pending = sorted(ledger[ledger["placed"].isna()]["race_id"].unique())
+        st.markdown("### Enter a finishing order")
+        if not pending:
+            st.success("Every logged race has a result recorded.")
+        else:
+            rid = st.selectbox("Race awaiting a result", pending)
+            fld = int(ledger[ledger["race_id"] == rid]["field_size"].iloc[0])
+            pl = int(ledger[ledger["race_id"] == rid]["places_paid"].iloc[0])
+            st.caption(f"{fld} runners, {pl} places paid. Enter the finishing order as "
+                       f"**tab numbers, winner first** — the first {pl} are enough.")
+            fin_txt = st.text_input("Finishing order", key=f"fin_{rid}",
+                                    placeholder="e.g. 6, 5, 1")
+            if st.button("Save result", type="primary"):
+                try:
+                    fins = [int(x) for x in fin_txt.replace(";", ",").split(",") if x.strip()]
+                except ValueError:
+                    fins = []
+                valid = set(ledger[ledger["race_id"] == rid]["tab"].astype(int))
+                unknown = [t for t in fins if t not in valid]
+                if not fins:
+                    st.error("Could not read any tab numbers from that.")
+                elif unknown:
+                    st.error(f"Tab number(s) {unknown} are not in that race's field.")
+                elif len(fins) < pl:
+                    st.error(f"That race pays {pl} places — enter at least {pl} finishers.")
+                elif len(set(fins)) != len(fins):
+                    st.error("The same tab number appears twice.")
+                else:
+                    st.session_state["ledger"] = rl.record_result(ledger, rid, fins)
+                    ledger = st.session_state["ledger"]
+                    st.success(f"Recorded {rid}: {' - '.join(str(t) for t in fins)}")
+
+        perf = rl.performance(ledger)
+        state, msg = rl.readiness(perf.get("races", 0))
+        st.divider()
+        st.markdown("### Measured performance")
+        {"empty": st.info, "thin": st.info, "monitor": st.warning,
+         "tune": st.success, "confident": st.success}[state](msg)
+
+        if perf.get("races", 0):
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Settled races", perf["races"])
+            m2.metric("Selections", perf["selections"])
+            if "precision" in perf:
+                m3.metric("Selections that placed", f"{perf['precision']:.1%}",
+                          f"base rate {perf['base_rate']:.1%}")
+                m4.metric("95% interval",
+                          f"{perf['ci_low']:.0%}–{perf['ci_high']:.0%}")
+            st.caption(
+                f"Place-probability log-loss **{perf['logloss']:.4f}**, Brier "
+                f"**{perf['brier']:.4f}**. Predicted place rate "
+                f"{perf['mean_predicted']:.1%} vs actual {perf['actual_rate']:.1%}.")
+            if "precision" in perf and perf["ci_low"] <= perf["base_rate"]:
+                st.caption("⚠️ The interval still includes the base rate — on this much "
+                           "data the selections are not yet distinguishable from "
+                           "picking at random.")
+            if perf["calibration"]:
+                st.markdown("**Calibration** — does a 40% call place 40% of the time?")
+                cal = pd.DataFrame(perf["calibration"])
+                cal["predicted"] = (100 * cal["predicted"]).round(1)
+                cal["actual"] = (100 * cal["actual"]).round(1)
+                st.dataframe(cal.rename(columns={
+                    "band": "Predicted band", "n": "n",
+                    "predicted": "Mean predicted %", "actual": "Actual placed %"}),
+                    width="stretch", hide_index=True)
+
+        st.divider()
+        st.markdown("### Threshold tuning")
+        s_df = rl.settled(ledger)
+        n_races = s_df["race_id"].nunique() if not s_df.empty else 0
+        if n_races < rl.MIN_RACES_TO_TUNE:
+            st.info(
+                f"**Locked — {n_races} of {rl.MIN_RACES_TO_TUNE} races.** Tuning "
+                "thresholds on fewer races fits noise and would make the app worse, "
+                "not better. Keep logging; the ledger is already earning its keep "
+                "by monitoring for a broken rule above.")
+            with st.expander("How much data does tuning actually need?"):
+                st.markdown(
+                    "| Question | Races |\n|---|---|\n"
+                    "| Has a rule quietly broken (47% → 20%)? | ~17 |\n"
+                    "| Does it beat a dart throw? | ~45 |\n"
+                    "| Does consensus really beat model top-3? | ~71 |\n"
+                    "| Is 47% genuinely better than 40%? | ~273 |\n\n"
+                    "Derived from a two-proportion power calculation at 80% power. "
+                    "The core model's feature weights are **not** tuned here — those "
+                    "were calibrated on roughly 1,700 races and cannot be moved by "
+                    "logging finishing positions.")
+        else:
+            if st.button("Run tuner", type="primary"):
+                with st.spinner("Cross-validating threshold combinations…"):
+                    st.session_state["tuned"] = rl.tune(s_df)
+            tuned = st.session_state.get("tuned")
+            if tuned and tuned.get("ok"):
+                p = tuned["params"]
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Current default", f"{tuned['current']['precision']:.1%}")
+                c2.metric("Suggested (in-sample)", f"{tuned['in_sample']['precision']:.1%}")
+                c3.metric("Suggested (cross-validated)", f"{tuned['cv_precision']:.1%}",
+                          help="The only number that means anything: thresholds chosen "
+                               "on the other races, then applied to the held-out one.")
+                st.markdown(
+                    f"**Suggested thresholds** — model shortlist **{p['top_n']}**, "
+                    f"market top **{p['market_top']}**, F/M below **{p['fm_max']}**, "
+                    f"cap **{p['max_picks']}**.")
+                gap = tuned["in_sample"]["precision"] - tuned["cv_precision"]
+                if gap > 0.05:
+                    st.warning(
+                        f"In-sample beats cross-validated by {gap:.1%}. That gap **is** "
+                        "the over-fitting — trust the cross-validated figure, not the "
+                        "headline.")
+                if tuned["cv_precision"] <= tuned["current"]["precision"]:
+                    st.info("Cross-validated tuning does **not** beat the current "
+                            "defaults. Leave them alone.")
+                else:
+                    st.success("Cross-validated tuning beats the defaults. Set these "
+                               "values in the sidebar if you want to adopt them.")
+                if not tuned["trustworthy"]:
+                    st.caption("Sample is still below the confident threshold — treat "
+                               "this as provisional.")
+
+        with st.expander("The full ledger"):
+            st.dataframe(ledger, width="stretch", hide_index=True)
 
 with explain_tab:
     result = st.session_state["result"]
