@@ -8,6 +8,7 @@ import streamlit as st
 
 import horse_model as model
 import horse_parser as parser
+import place_finder as pf
 
 st.set_page_config(page_title="HorsePredictor", page_icon=":horse_racing:",
                    layout="wide", initial_sidebar_state="expanded")
@@ -117,14 +118,30 @@ with st.sidebar:
                      int(model.SIMS), 5_000)
     seed = st.number_input("Random seed", value=42, step=1)
     st.divider()
+    st.subheader("Place Finder criteria")
+    place_top_n = st.slider(
+        "Shortlist size (top N by model rank)", 3, 8, pf.DEFAULT_TOP_N, 1,
+        help="Placegetters come from deeper than winners. On the Wolverhampton card "
+             "the top 3 caught 37.5% of placegetters; the top 5 caught 75%.")
+    place_fm_max = st.slider(
+        "Exclude F/M at or above", 1.0, 5.0, pf.DEFAULT_FM_MAX, 0.1,
+        help="Horses the form model rates far above the market. On that card, "
+             "F/M ≥ 2.0 placed 1 time in 20.")
+    place_shrink = st.slider(
+        "Shrink toward base rate", 0.0, 0.5, pf.DEFAULT_SHRINK, 0.05,
+        help="Pulls place probabilities toward places/runners. Corrects the "
+             "observed over-confidence at the top and under-confidence at the "
+             "bottom without fitting a curve to a tiny sample. 0 = raw model.")
+    st.divider()
     st.caption(
         "Fundamentals: official rating → weight carried → career strike rate → "
         "distance record → going record → jockey/trainer form → last-start "
         "finish → freshness → R&S ratings.")
     st.caption("Prediction is probabilistic decision support, not a guaranteed outcome.")
 
-paste_tab, parsed_tab, pred_tab, explain_tab, method_tab = st.tabs(
-    ["1 · Paste Data", "2 · Parsed Data", "3 · Prediction", "4 · Explanations", "Method"])
+paste_tab, parsed_tab, pred_tab, place_tab, explain_tab, method_tab = st.tabs(
+    ["1 · Paste Data", "2 · Parsed Data", "3 · Prediction", "4 · Place Finder",
+     "5 · Explanations", "Method"])
 
 with paste_tab:
     st.subheader("Paste the full Racing & Sports thoroughbred Enhanced Form page")
@@ -226,6 +243,80 @@ with pred_tab:
                     df.to_csv(index=False).encode("utf-8"),
                     file_name=f"{h.get('track','race')}_R{h.get('race_no','')}_prediction.csv",
                     mime="text/csv")
+
+with place_tab:
+    runners = st.session_state["runners"]
+    result = st.session_state["result"]
+    if not runners:
+        st.info("Parse a race in **1 · Paste Data** first.")
+    elif not result:
+        st.info("Run the prediction in **3 · Prediction** first — the place table is "
+                "built from the same finishing-order simulation.")
+    else:
+        active = [r for r in runners if not r.get("scratched")]
+        st.subheader("Place Finder")
+        auto = pf.places_paid(len(active))
+        c1, c2 = st.columns([1, 3])
+        places = c1.selectbox(
+            "Places paid", [0, 1, 2, 3, 4],
+            index=[0, 1, 2, 3, 4].index(auto),
+            help="Defaults to standard terms: 3 places for 8+ runners, 2 for 5-7, "
+                 "none under 5. Override if your bookmaker differs.")
+        with st.expander("Optional: enter place odds to price the bets"):
+            st.caption("Enter the place price for any runner you are considering. "
+                       "Edge = adjusted place probability × your price − 1.")
+            po_text = st.text_input(
+                "Place odds as `tab:price` pairs", value="",
+                placeholder="e.g. 4:2.10, 7:3.40, 11:5.00")
+        place_odds = {}
+        for chunk in po_text.replace(";", ",").split(","):
+            if ":" in chunk:
+                t, _, o = chunk.partition(":")
+                try:
+                    place_odds[int(t.strip())] = float(o.strip())
+                except ValueError:
+                    pass
+        if po_text and not place_odds:
+            st.warning("Could not read any `tab:price` pairs from that text.")
+
+        table, meta = pf.build(active, result, top_n=int(place_top_n),
+                               fm_max=float(place_fm_max), shrink=float(place_shrink),
+                               places=int(places), place_odds=place_odds or None)
+        if meta["no_place_market"]:
+            st.warning(pf.summary_line(meta))
+        else:
+            st.caption(pf.summary_line(meta))
+
+        picks = table[table["Status"] == pf.STATUS_QUALIFY]
+        if len(picks):
+            names = " · ".join(
+                f'#{int(row["Tab"])} {row["Horse"]} ({row["Place% (adj)"]:.1f}%)'
+                for _, row in picks.iterrows())
+            st.markdown(
+                f'<div class="pick"><div class="muted">PLACE SHORTLIST</div>'
+                f'<div style="font-size:1.05rem;margin-top:.3rem">{names}</div></div>',
+                unsafe_allow_html=True)
+        else:
+            st.info("No runner met all the criteria in this race.")
+
+        st.dataframe(pf.style(table), width="stretch", hide_index=True)
+        st.caption(
+            "🟩 **QUALIFIES** — inside the shortlist and past the F/M filter.  "
+            "🟨 **F/M filter** — well rated by the form model but far above the "
+            "market's opinion; a trap for place purposes.  ⬜ outside the shortlist. "
+            "**Fair place $** is 1 ÷ adjusted place probability — only bet when the "
+            "actual place market pays more than that.")
+        st.warning(
+            "These criteria were derived from **one meeting — six races, 16 "
+            "placegetters**. They are a sensible working method, not a proven edge. "
+            "On that same card the three shortest Betfair prices found more "
+            "placegetters than the model did.")
+        st.download_button(
+            "Download place table as CSV",
+            table.to_csv(index=False).encode("utf-8"),
+            file_name=f"{st.session_state['header'].get('track','race')}"
+                      f"_R{st.session_state['header'].get('race_no','')}_places.csv",
+            mime="text/csv")
 
 with explain_tab:
     result = st.session_state["result"]

@@ -16,8 +16,10 @@ and produces market-anchored win probabilities, fair prices and value flags.
   clipboard format.
 - `horse_model.py` — Shin de-vig → conditional-logit fundamentals → Benter
   blend → discounted Plackett–Luce finishing-order simulation.
+- `place_finder.py` — placegetter shortlist and criteria (see below).
 - `app.py` — Streamlit UI.
-- `test_parser.py` + `tests_fixture_tamworth_r4.txt` — regression suite.
+- `test_parser.py` + `tests_fixture_tamworth_r4.txt` — parser regression suite.
+- `test_place_finder.py` — Place Finder regression suite.
 
 ## Parser design
 
@@ -74,6 +76,40 @@ Barrier position (`BP`) is now parsed and displayed but is **not** a model
 feature — the feature weights were validated without it, so adding it is a
 deliberate recalibration rather than a free win.
 
+## Place Finder
+
+A dedicated tab that highlights likely placegetters. The criteria came from
+scoring the model against a real Wolverhampton card — six races, 16 placegetters
+— and each rule earned its place:
+
+| Rule | Why |
+|---|---|
+| **Shortlist the top 5**, not the top 3 | Placegetters come from deeper than winners. Top 3 caught 37.5% of them; top 5 caught **75%** |
+| **Exclude F/M ≥ 2.0×** | Horses the form model rates at twice the market's opinion placed **1 time in 20** |
+| **Use the right place count** | `Top3%` is a *top-three* number. Fields of 5–7 pay only two places, so the app switches to `Top2%` automatically |
+| **Shrink toward the base rate** | Observed place rates ran *above* the model in its low band and *below* it in its high band. A shrink toward `places / runners` corrects both tails at once |
+
+Rows are colour-coded — 🟩 qualifies, 🟨 excluded by the F/M filter, ⬜ outside
+the shortlist — and every threshold is adjustable in the sidebar.
+
+**Fair place $ = 1 ÷ adjusted place probability.** Enter actual place odds as
+`tab:price` pairs and the table shows the edge on each.
+
+### Why the shrink is a shrink and not a fitted curve
+
+Fitting a calibration curve to 16 observations would be over-fitting dressed up
+as rigour. Shrinking toward `places / runners` — what a dart throw scores — is
+principled, moves both tails in the direction the data indicated, and degrades
+gracefully. Set it to 0 for the raw model.
+
+### Honest limits
+
+These criteria rest on **one meeting**. They are a sensible working method, not
+a proven edge, and the app says so on the tab. On that same card the three
+shortest Betfair prices found **more** placegetters than the model did (6 of 16
+versus 4 of 16). Treat the shortlist as a starting point for pricing against the
+actual place market, not as a tip sheet.
+
 ## Run locally
 
 ```bash
@@ -93,6 +129,15 @@ python test_parser.py
 Expect `PASS 255  FAIL 0`. Run it whenever Racing & Sports change their markup.
 If a page ever parses to fewer runners than its field table shows, save the
 paste as a new fixture and add it to `FIXTURES` in `test_parser.py`.
+
+The Place Finder has its own suite covering the place-terms rule, the shrink
+behaviour, the F/M exclusion and the odds maths:
+
+```bash
+python test_place_finder.py
+```
+
+Expect `PASS 35  FAIL 0`.
 
 ## Deploy (Streamlit Community Cloud)
 

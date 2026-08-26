@@ -146,6 +146,7 @@ def predict(runners, header, alpha=MARKET_ALPHA, sims=SIMS, seed=42,
             pos_counts[pick, k] += 1
     pos_prob = pos_counts / sims
     exp_pos = pos_prob @ np.arange(1, n + 1)
+    top2 = pos_prob[:, :min(2, n)].sum(axis=1)
     top3 = pos_prob[:, :min(3, n)].sum(axis=1)
 
     # -------- EV & recommendations --------
@@ -195,7 +196,7 @@ def predict(runners, header, alpha=MARKET_ALPHA, sims=SIMS, seed=42,
 
     return {
         "p_mkt": p_mkt, "p_fund": p_fund, "p_win": p_win,
-        "pos_prob": pos_prob, "exp_pos": exp_pos, "top3": top3,
+        "pos_prob": pos_prob, "exp_pos": exp_pos, "top2": top2, "top3": top3,
         "ev_win": ev_win, "conf": conf, "overall_conf": overall_conf,
         "recs": recs, "why": why, "order": order,
         "overround_tab": overround, "shin_z": z_shin,
