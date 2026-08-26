@@ -441,9 +441,14 @@ def _parse_block(block: str, runner: dict[str, Any]) -> dict[str, Any]:
     if m:
         d["dist_min"], d["dist_max"] = _i(m.group(1)), _i(m.group(2))
 
-    m = re.search(r"(?i)Days Since Last Run:\s*(\d+)\s*days", body)
+    m = re.search(r"(?i)Days Since Last Run:\s*(\d+)\s*days(?:\s*\((FU|\d+U)\))?", body)
     if m:
         d["dslr"] = _i(m.group(1))
+        # R&S tag the run of the preparation: (FU) first-up, (2U) second-up, ...
+        if m.group(2):
+            tag = m.group(2).upper()
+            d["runup_tag"] = tag
+            d["runup"] = 1 if tag == "FU" else _i(tag.rstrip("U"))
 
     filt = _parse_filters(body)
     d["filters"] = filt

@@ -109,6 +109,32 @@ def main():
         b = sorted(rl.selections_for_race(snap, tn, mt, fm, mp))
         c.check(f"agreement at ({tn},{mt},{fm},{mp})", b, a)
 
+    # ---- the full feature vector is captured -----------------------------
+    c.true("schema splits into core / raw / feature blocks",
+           rl.LEDGER_COLUMNS == rl.CORE_COLUMNS + rl.RAW_COLUMNS + rl.FEATURE_COLUMNS)
+    c.check("one feature column per model feature", len(rl.FEATURE_COLUMNS),
+            len(hm.FEATURES) + len(hm.EXTRA_FEATURES))
+    feat_cols = [c2 for c2 in snap.columns if c2.startswith("feat_")]
+    c.check("every feature value stored", len(feat_cols), len(rl.FEATURE_COLUMNS))
+    c.check("no missing feature values", int(snap[feat_cols].isna().sum().sum()), 0)
+    c.true("race context stored for later conditioning",
+           all(snap[k].notna().all() for k in ("going", "surface", "distance_m")))
+    for col in ("runup", "jt_win", "CrsDist_starts", "FU_starts", "ohr", "wt"):
+        c.true(f"raw field {col} stored", col in snap.columns)
+    c.true("recent-run count stored", (snap["n_recent_runs"] >= 0).all())
+
+    # ---- older ledgers still load ----------------------------------------
+    legacy = snap[["race_id", "tab", "horse", "model_rank", "fm", "mkt_rank",
+                   "placed", "places_paid", "field_size"]].copy()
+    conformed = rl.conform(legacy)
+    c.check("conform restores the full schema",
+            list(conformed.columns), rl.LEDGER_COLUMNS)
+    c.check("conform keeps every row", len(conformed), len(legacy))
+    c.true("conform preserves the data it had",
+           list(conformed["horse"]) == list(legacy["horse"]))
+    c.true("conform still supports re-deriving selections",
+           len(rl.selections_for_race(conformed, 5, 3, 2.0, 3)) > 0)
+
     # ---- merge -----------------------------------------------------------
     led = rl.merge(rl.empty_ledger(), snap)
     c.check("merge into empty", len(led), len(snap))

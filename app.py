@@ -117,6 +117,18 @@ with st.sidebar:
         help="Exchange price vs Shin-corrected TAB price inside the market term.")
     sims = st.slider("Finishing-order simulations", 5_000, 60_000,
                      int(model.SIMS), 5_000)
+    extended = st.checkbox(
+        "Extended fundamentals", value=True,
+        help="Adds course & distance record, record at this run of the "
+             "preparation, and the jockey/trainer partnership strike rate. "
+             "Their weights are informed priors, not fitted values — there is no "
+             "labelled horse dataset here to fit against. Untick to fall back to "
+             "the ten originally calibrated features and compare.")
+    if extended:
+        st.caption("13 fundamentals active — 10 calibrated + 3 added "
+                   "(**unvalidated weights**).")
+    else:
+        st.caption("10 calibrated fundamentals active.")
     seed = st.number_input("Random seed", value=42, step=1)
     st.divider()
     st.subheader("Place Finder criteria")
@@ -136,8 +148,11 @@ with st.sidebar:
              "the market choose beat narrowing it.")
     place_fm_max = st.slider(
         "Exclude F/M at or above", 1.0, 5.0, pf.DEFAULT_FM_MAX, 0.1,
-        help="Horses the form model rates far above the market. On that card, "
-             "F/M ≥ 2.0 placed 1 time in 20.")
+        help="Horses the form model rates far above the market. On the "
+             "Wolverhampton card, F/M ≥ 2.0 placed 1 time in 20. NOTE: this "
+             "threshold is coupled to the feature set — turning on the extended "
+             "fundamentals raises F/M for horses the form model likes, so 2.0 "
+             "bites harder than it did on the ten calibrated features.")
     place_shrink = st.slider(
         "Shrink toward base rate", 0.0, 0.5, pf.DEFAULT_SHRINK, 0.05,
         help="Pulls place probabilities toward places/runners. Corrects the "
@@ -215,7 +230,8 @@ with pred_tab:
                 with st.spinner(f"Running {int(sims):,} simulations…"):
                     result = model.predict(active, h, alpha=float(alpha),
                                            bf_weight=float(bf_w),
-                                           sims=int(sims), seed=int(seed))
+                                           sims=int(sims), seed=int(seed),
+                                           extended=bool(extended))
                     st.session_state["result"] = result
             result = st.session_state["result"]
             if result:
@@ -360,14 +376,21 @@ with results_tab:
         if up is not None:
             try:
                 loaded = pd.read_csv(up)
-                missing = [c for c in rl.LEDGER_COLUMNS if c not in loaded.columns]
-                if missing:
-                    st.error(f"That file is missing column(s): {', '.join(missing)}")
+                core_missing = [c for c in ("race_id", "tab", "model_rank")
+                                if c not in loaded.columns]
+                if core_missing:
+                    st.error("That does not look like a HorsePredictor ledger — "
+                             f"missing {', '.join(core_missing)}.")
                 else:
-                    st.session_state["ledger"] = loaded[rl.LEDGER_COLUMNS]
+                    added = [c for c in rl.LEDGER_COLUMNS if c not in loaded.columns]
+                    st.session_state["ledger"] = rl.conform(loaded)
                     ledger = st.session_state["ledger"]
                     st.success(f"Loaded {ledger['race_id'].nunique()} race(s), "
                                f"{len(ledger)} runner rows.")
+                    if added:
+                        st.info(f"That ledger predates {len(added)} column(s) added "
+                                "since — they are blank for those races, which only "
+                                "limits what can be re-derived from them.")
             except Exception as exc:                       # noqa: BLE001
                 st.error(f"Could not read that CSV: {exc}")
         if not ledger.empty:

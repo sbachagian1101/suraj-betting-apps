@@ -37,13 +37,36 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+import horse_model as hm
+
 # Enough per runner to re-derive any threshold combination offline.
-LEDGER_COLUMNS = [
-    "race_id", "date", "track", "race_no", "field_size", "places_paid",
+CORE_COLUMNS = [
+    "race_id", "date", "track", "race_no", "going", "surface", "distance_m",
+    "field_size", "places_paid",
     "tab", "horse", "model_rank", "win_pct", "place_pct_raw", "place_pct_adj",
     "fm", "mkt_rank", "bf_odds", "tab_odds", "conf", "status_at_prediction",
     "finish_pos", "placed",
 ]
+
+# The raw parsed fields. Stored so that features nobody has thought of yet can
+# still be derived from races logged today - the whole point of keeping them.
+_RECORD_KEYS = ["Car", "M12", "Crs", "Dist", "CrsDist", "Firm", "Good", "Soft",
+                "Heavy", "AW", "Turf", "FU", "U2", "U3"]
+RAW_COLUMNS = (
+    ["wt", "bp", "claim", "jrat", "trat", "age", "sex", "maiden", "form",
+     "ohr", "dslr", "runup", "runup_tag",
+     "jky_win", "jky_place", "jky_n", "trn_win", "trn_place", "trn_n",
+     "jh_win", "jh_place", "jh_n", "jt_win", "jt_place", "jt_n",
+     "dist_min", "dist_max", "win_dist",
+     "last_fin", "last_margin", "last_sp", "api_avg", "n_recent_runs"]
+    + [f"{k}_{s}" for k in _RECORD_KEYS for s in ("wins", "places", "starts")]
+)
+
+# The model's own feature values, so weights can be re-fitted directly once
+# enough races have been settled.
+FEATURE_COLUMNS = ["feat_" + n for n, _, _ in hm.FEATURES + hm.EXTRA_FEATURES]
+
+LEDGER_COLUMNS = CORE_COLUMNS + RAW_COLUMNS + FEATURE_COLUMNS
 
 MIN_RACES_TO_REPORT = 5     # below this, summary stats are noise
 MIN_RACES_TO_TUNE = 40      # below this, tuning fits noise
@@ -61,15 +84,32 @@ def snapshot(header: dict[str, Any], active: list[dict[str, Any]],
     """Freeze one race's prediction into ledger rows, results not yet known."""
     rid = race_id(header)
     by_tab = {int(r.get("tab") or -1): r for r in active}
+    idx_by_tab = {int(r.get("tab") or -1): i for i, r in enumerate(active)}
+    try:
+        feats = hm.build_features(active, header,
+                                  extended=bool(result.get("extended", True)))
+    except Exception:                                        # noqa: BLE001
+        feats = {}
     rows = []
     for _, t in table.iterrows():
         tab = int(t["Tab"])
         r = by_tab.get(tab, {})
+        i = idx_by_tab.get(tab)
+        extra = {c: r.get(c) for c in RAW_COLUMNS}
+        extra["n_recent_runs"] = len(r.get("recent_runs", []) or [])
+        for name in (n for n, _, _ in hm.FEATURES + hm.EXTRA_FEATURES):
+            v = feats.get(name)
+            extra["feat_" + name] = (float(v[i]) if v is not None and i is not None
+                                     and i < len(v) else np.nan)
         rows.append({
+            **extra,
             "race_id": rid,
             "date": header.get("date", ""),
             "track": header.get("track", ""),
             "race_no": header.get("race_no", ""),
+            "going": header.get("going", ""),
+            "surface": header.get("surface", ""),
+            "distance_m": header.get("distance_m", ""),
             "field_size": meta["runners"],
             "places_paid": meta["places"],
             "tab": tab,
@@ -92,6 +132,18 @@ def snapshot(header: dict[str, Any], active: list[dict[str, Any]],
 
 def empty_ledger() -> pd.DataFrame:
     return pd.DataFrame(columns=LEDGER_COLUMNS)
+
+
+def conform(df: pd.DataFrame) -> pd.DataFrame:
+    """Bring an older ledger up to the current schema without losing rows."""
+    out = df.copy()
+    missing = [c for c in LEDGER_COLUMNS if c not in out.columns]
+    if missing:
+        # Added in one concat rather than column by column, which pandas warns
+        # about as a highly fragmented frame.
+        out = pd.concat(
+            [out, pd.DataFrame(np.nan, index=out.index, columns=missing)], axis=1)
+    return out[LEDGER_COLUMNS]
 
 
 def merge(ledger: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:

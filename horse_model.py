@@ -35,6 +35,102 @@ FEATURES = [
     ("jt_rat",     0.25, "R&S jockey+trainer rating"),
 ]
 
+# Added on request after an audit found them parsed but unscored. Their weights
+# are PRIORS, not fitted values - there is no labelled horse dataset here to fit
+# against, unlike the soccer model. They are deliberately smaller than the
+# established terms they overlap with, and the whole block can be switched off.
+EXTRA_FEATURES = [
+    ("cd_plc",    0.20, "course & distance record"),
+    ("runup_rec", 0.20, "record at this run of the preparation"),
+    ("jt_combo",  0.15, "jockey/trainer partnership strike rate"),
+]
+
+
+def _shrunk(made, starts, prior, m=3.0):
+    """Rate shrunk toward a prior, so a 1-from-1 record is not read as 100%."""
+    starts = max(int(starts or 0), 0)
+    return (float(made or 0) + m * float(prior)) / (starts + m)
+
+
+def _career_rate(r, placings=False):
+    s = int(r.get("Car_starts", 0) or 0)
+    if not s:
+        return 0.30 if placings else 0.10
+    made = int(r.get("Car_wins", 0) or 0)
+    if placings:
+        made += int(r.get("Car_places", 0) or 0)
+    return made / s
+
+
+# Which record to read for today's going, and what to fall back to when the
+# horse has barely raced on it. Reading a Heavy-track race off a horse's SOFT
+# record - as this model used to - throws away the Heavy column entirely.
+GOING_CHAIN = {
+    "FIRM":  ["Firm", "Good", "Soft"],
+    "GOOD":  ["Good", "Soft", "Firm"],
+    "SOFT":  ["Soft", "Heavy", "Good"],
+    "HEAVY": ["Heavy", "Soft", "Good"],
+    "SLOW":  ["Soft", "Heavy", "Good"],
+    "WET":   ["Soft", "Heavy", "Good"],
+    "FAST":  ["Firm", "Good", "Soft"],
+}
+_SYNTHETIC = ("AW", "ALL WEATHER", "SYNTHETIC", "POLYTRACK", "TAPETA", "DIRT")
+
+
+def _going_rate(r, going, surface):
+    """Win rate on today's going, from the matching column with sane fallbacks."""
+    prior = _career_rate(r)
+    surf = str(surface or "").upper()
+    if any(k in surf for k in _SYNTHETIC):
+        chain = ["AW", "Turf"]
+    else:
+        chain = GOING_CHAIN.get(str(going or "GOOD").upper(), ["Good", "Soft"])
+    for key in chain:
+        s = int(r.get(f"{key}_starts", 0) or 0)
+        if s >= 2:
+            return _shrunk(r.get(f"{key}_wins", 0), s, prior)
+    return prior
+
+
+def _cd_rate(r):
+    """Course-and-distance placing rate, shrunk toward the distance record."""
+    ds = int(r.get("Dist_starts", 0) or 0)
+    prior = (((r.get("Dist_wins", 0) or 0) + (r.get("Dist_places", 0) or 0)) / ds
+             if ds else _career_rate(r, placings=True))
+    s = int(r.get("CrsDist_starts", 0) or 0)
+    if not s:
+        return prior
+    return _shrunk((r.get("CrsDist_wins", 0) or 0) + (r.get("CrsDist_places", 0) or 0),
+                   s, prior)
+
+
+def _runup_rate(r):
+    """Record at the horse's current run of the preparation (first-up, 2nd-up...).
+
+    Replaces guessing fitness from days-since-run alone: a horse that is 3-from-4
+    first-up is a very different proposition from one that has never fired fresh.
+    Beyond the third run R&S publish no split, so it falls back to career.
+    """
+    prior = _career_rate(r, placings=True)
+    key = {1: "FU", 2: "U2", 3: "U3"}.get(int(r.get("runup", 0) or 0))
+    if not key:
+        return prior
+    s = int(r.get(f"{key}_starts", 0) or 0)
+    if not s:
+        return prior
+    return _shrunk((r.get(f"{key}_wins", 0) or 0) + (r.get(f"{key}_places", 0) or 0),
+                   s, prior)
+
+
+def _jt_combo(r):
+    """Actual jockey/trainer partnership strike rate, shrunk on sample size."""
+    prior = 0.5 * (float(r.get("jky_win", 0.08) or 0.08)
+                   + float(r.get("trn_win", 0.08) or 0.08))
+    n = int(r.get("jt_n", 0) or 0)
+    if not n:
+        return prior
+    return (float(r.get("jt_win", 0.0) or 0.0) * n + 8.0 * prior) / (n + 8.0)
+
 
 def _z(x):
     x = np.asarray(x, float)
@@ -80,9 +176,7 @@ def shin_probs(odds):
     return p / p.sum(), z, beta
 
 
-def build_features(runners, header):
-    going = (header.get("going", "GOOD") or "GOOD").upper()
-    going_lbl = "Soft" if going.startswith(("S", "H")) else "Good"
+def build_features(runners, header, extended=True):
     ohr = np.array([r["ohr"] for r in runners], float)
     if ohr.max() > 0:
         ohr[ohr == 0] = np.median(ohr[ohr > 0])  # impute missing
@@ -91,18 +185,23 @@ def build_features(runners, header):
         "neg_wt": -np.array([r["wt"] for r in runners]),
         "car_win": np.array([r["Car_win"] for r in runners]),
         "dist_plc": np.array([r["Dist_plc"] for r in runners]),
-        "going_win": np.array([r[f"{going_lbl}_win"] for r in runners]),
+        "going_win": np.array([_going_rate(r, header.get("going"),
+                                          header.get("surface")) for r in runners]),
         "jky_win": np.array([r["jky_win"] for r in runners]),
         "trn_win": np.array([r["trn_win"] for r in runners]),
         "neg_lastfin": -np.array([min(r["last_fin"], 8) for r in runners], float),
         "freshness": -np.abs(np.array([r["dslr"] for r in runners], float) - 21),
         "jt_rat": np.array([r["jrat"] + r["trat"] for r in runners]),
     }
+    if extended:
+        feats["cd_plc"] = np.array([_cd_rate(r) for r in runners])
+        feats["runup_rec"] = np.array([_runup_rate(r) for r in runners])
+        feats["jt_combo"] = np.array([_jt_combo(r) for r in runners])
     return feats
 
 
 def predict(runners, header, alpha=MARKET_ALPHA, sims=SIMS, seed=42,
-            bf_weight=BF_WEIGHT):
+            bf_weight=BF_WEIGHT, extended=True):
     rng = np.random.default_rng(seed)
     n = len(runners)
     tab_odds = np.array([r["tab_odds"] for r in runners])
@@ -116,10 +215,11 @@ def predict(runners, header, alpha=MARKET_ALPHA, sims=SIMS, seed=42,
     p_mkt /= p_mkt.sum()
 
     # -------- fundamental (Bolton-Chapman conditional logit) --------
-    feats = build_features(runners, header)
+    feats = build_features(runners, header, extended=extended)
+    active_features = FEATURES + (EXTRA_FEATURES if extended else [])
     V = np.zeros(n)
     contribs = {}                       # per-horse feature contributions
-    for name, beta, label in FEATURES:
+    for name, beta, label in active_features:
         zc = _z(feats[name]) * beta
         V += zc
         contribs[name] = zc
@@ -202,13 +302,14 @@ def predict(runners, header, alpha=MARKET_ALPHA, sims=SIMS, seed=42,
         "overround_tab": overround, "shin_z": z_shin,
         "book_bf": float((1 / bf_odds).sum()),
         "alpha": alpha, "fund_mkt_ratio": fund_mkt_ratio, "sims": sims,
+        "features_used": [f[0] for f in active_features], "extended": extended,
     }
 
 
 def _explain(r, i, contribs, p_mkt, p_fund, p_win, ev, ratio, conf,
              sharp, agree, depth, rec, exp_pos, top3):
     """Template explanation citing the actual feature contributions."""
-    labels = {name: lbl for name, _, lbl in FEATURES}
+    labels = {name: lbl for name, _, lbl in FEATURES + EXTRA_FEATURES}
     cvals = sorted(((contribs[k][i], labels[k]) for k in contribs),
                    key=lambda t: -abs(t[0]))
     pos = [f"{lbl} (+{v:.2f})" for v, lbl in cvals if v > 0.08][:3]

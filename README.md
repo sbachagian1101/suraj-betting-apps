@@ -74,9 +74,55 @@ Pipeline: Shin (1993) de-vig → Betfair/TAB market blend → Bolton & Chapman
 blend at weight α → Lo, Bacon-Shone & Busche (1995) discounted Plackett–Luce
 Monte Carlo for place and top-3 probabilities.
 
-Barrier position (`BP`) is now parsed and displayed but is **not** a model
-feature — the feature weights were validated without it, so adding it is a
-deliberate recalibration rather than a free win.
+### Going column fix
+
+The model reads a horse's record on today's going. It used to collapse every
+surface into two buckets:
+
+```
+race going HEAVY  ->  read the Soft_win column     # the Heavy column was ignored
+race going FIRM   ->  read the Good_win column     # likewise Firm
+```
+
+A horse's Heavy, Firm, AW and Turf records are all parsed. The model now reads
+the matching column, with a fallback chain (Heavy → Soft → Good) for horses with
+fewer than two starts on it, and shrinkage toward the career rate so a 1-from-1
+record is not read as a 100% strike rate. Synthetic and all-weather surfaces use
+the `AW` column.
+
+### Extended fundamentals (opt-out, unvalidated weights)
+
+An audit found **115 scalar fields parsed per horse plus 5 recent runs × 21
+fields**, of which the model scored ten — and of the ~105 recent-run values it
+used exactly one, the last-start finishing position. Three of the strongest
+unused signals were added:
+
+| Feature | Weight | What it fixes |
+|---|---|---|
+| Course & distance record | 0.20 | Only the *distance* record was used; course and C&D were ignored |
+| Record at this run of the preparation | 0.20 | `freshness` was `−\|days − 21\|`, a V-shape that ignored whether the horse actually performs fresh |
+| Jockey/trainer partnership strike rate | 0.15 | The model used `jrat + trat` (R&S *ratings*); the partnership's real record was parsed and unused |
+
+The run-of-preparation feature needed a parser addition: R&S tag each horse
+`(FU)`, `(2U)`, `(3U)`… in the *Days Since Last Run* line, and that marker was
+being discarded. It is now captured as `runup`.
+
+> **These three weights are informed priors, not fitted values.** There is no
+> labelled horse dataset in this repo to fit against — unlike the soccer model,
+> where the blend weights were chosen by walk-forward backtest on 491 matches.
+> They are deliberately smaller than the established terms they overlap with, and
+> the whole block can be switched off with **Extended fundamentals** in the
+> sidebar to compare against the ten originally calibrated features.
+
+**One coupling worth knowing.** F/M is the ratio of fundamental to market
+probability, and strengthening the fundamentals mechanically raises it for
+horses the form model likes. On the Tamworth fixture the top pick's F/M moved
+**1.51 → 2.02**, which trips the Place Finder's `F/M ≥ 2.0` exclusion and drops
+the selections from three to two. The threshold and the feature set are not
+independent — if you run the extended features, consider raising the F/M cut.
+
+Barrier position (`BP`) and the apprentice claim are parsed and displayed but are
+still **not** model features.
 
 ## Place Finder
 
@@ -137,11 +183,18 @@ Log a prediction, enter the finishing order once the race is run, and the app
 tracks how the selections are actually doing. Two things it is careful about:
 
 **What can and cannot be learned from outcomes.** The model's feature weights
-were calibrated on roughly 1,700 races and **cannot** be moved by logging
-finishing positions — you would need the full feature vector for hundreds of
-races, and re-fitting on a few dozen would be worse than leaving them alone. The
-five Place Finder thresholds *can* be tuned, because those are the part currently
-resting on sixteen placegetters.
+were calibrated on roughly 1,700 races. The five Place Finder thresholds *can* be
+tuned from your results, because those are the part currently resting on sixteen
+placegetters.
+
+Re-fitting the model's own weights needs the full feature vector for hundreds of
+races — so the ledger now **stores it**. Every logged runner carries all 13
+feature values, the raw parsed fields they were built from (going and surface
+records, first-up/second-up splits, jockey/trainer partnership, course and C&D
+records, run-of-preparation) and the race context. That is 111 columns per
+runner, kept so that features nobody has thought of yet can still be derived from
+races logged today. Once a few hundred races have settled, the weights become an
+empirical question instead of a judgement call.
 
 **How much data that actually needs.** From a two-proportion power calculation at
 80% power:
@@ -188,7 +241,7 @@ expected values read off the page rather than from parser output:
 python test_parser.py
 ```
 
-Expect `PASS 255  FAIL 0`. Run it whenever Racing & Sports change their markup.
+Expect `PASS 265  FAIL 0`. Run it whenever Racing & Sports change their markup.
 If a page ever parses to fewer runners than its field table shows, save the
 paste as a new fixture and add it to `FIXTURES` in `test_parser.py`.
 
@@ -199,7 +252,7 @@ behaviour, the F/M exclusion and the odds maths:
 python test_place_finder.py
 ```
 
-Expect `PASS 51  FAIL 0`.
+Expect `PASS 65  FAIL 0`.
 
 The ledger and tuner have their own suite. Its most important check is that
 `results_log.selections_for_race` agrees exactly with `place_finder.build`: the
@@ -211,7 +264,7 @@ silently becomes wrong.
 python test_results_log.py
 ```
 
-Expect `PASS 49  FAIL 0`.
+Expect `PASS 65  FAIL 0`.
 
 ## Deploy (Streamlit Community Cloud)
 

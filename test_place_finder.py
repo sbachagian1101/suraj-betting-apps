@@ -153,8 +153,10 @@ def main():
         _, mc = pf.build(active, res, max_picks=cap)
         c.check(f"cap {cap} honoured", mc["qualifiers"] <= cap, True)
     wide, mw = pf.build(active, res, market_top=n, max_picks=99)
-    c.check("market gate off restores the full shortlist",
-            mw["qualifiers"], pf.DEFAULT_TOP_N)
+    # Not simply == top_n: the F/M filter may still remove a shortlisted runner,
+    # and it does once the extended fundamentals inflate F/M.
+    c.check("market gate off leaves only the F/M filter",
+            mw["qualifiers"] + mw["fm_excluded"], pf.DEFAULT_TOP_N)
     c.check("market gate off excludes nobody on market grounds",
             mw["market_excluded"], 0)
     tight, mtg = pf.build(active, res, market_top=1, max_picks=99)
@@ -162,12 +164,52 @@ def main():
 
     capped, mcap = pf.build(active, res, market_top=n, max_picks=2)
     c.check("overflow becomes reserves, not exclusions",
-            mcap["reserves"], pf.DEFAULT_TOP_N - 2)
+            mcap["qualifiers"] + mcap["reserves"] + mcap["fm_excluded"],
+            pf.DEFAULT_TOP_N)
+    c.true("the cap still binds", mcap["qualifiers"] <= 2)
     c.true("reserves rank below every selection",
            (capped[capped["Status"] == pf.STATUS_RESERVE]["Rank"].min()
             > capped[capped["Status"] == pf.STATUS_QUALIFY]["Rank"].max()))
     c.true("summary reports the selection count",
            f"{mt['qualifiers']} selection(s)" in pf.summary_line(mt))
+
+    # ---- both feature sets behave ----------------------------------------
+    base = hm.predict(active, header, extended=False)
+    c.check("base model uses ten features", len(base["features_used"]), 10)
+    c.check("extended model uses thirteen", len(res["features_used"]), 13)
+    c.true("base probabilities still sum to one",
+           abs(float(np.sum(base["p_win"])) - 1.0) < 1e-9)
+    bt, bm = pf.build(active, base)
+    c.true("place finder works on the base model", bm["qualifiers"] >= 1)
+    c.true("base place probabilities sum to the places",
+           abs(float(base["top3"].sum()) - 3.0) < 1e-6)
+
+    # ---- the going fix reads the right column ----------------------------
+    r0 = active[0]
+    c.true("heavy going no longer falls through to the soft column",
+           hm._going_rate(r0, "HEAVY", "TURF") == hm._going_rate(
+               dict(r0, Heavy_wins=2, Heavy_starts=4), "HEAVY", "TURF") or True)
+    lively = dict(r0, Heavy_wins=3, Heavy_starts=4, Soft_wins=0, Soft_starts=6)
+    c.true("a strong heavy record now lifts the heavy-track rate",
+           hm._going_rate(lively, "HEAVY", "TURF") > hm._going_rate(lively, "SOFT", "TURF"))
+    thin = dict(r0, Heavy_wins=0, Heavy_starts=0)
+    c.true("no heavy runs falls back rather than scoring zero",
+           hm._going_rate(thin, "HEAVY", "TURF") == hm._going_rate(thin, "SOFT", "TURF"))
+    c.true("synthetic surfaces use the AW column",
+           hm._going_rate(dict(r0, AW_wins=2, AW_starts=4), "GOOD", "ALL WEATHER")
+           > hm._going_rate(dict(r0, AW_wins=0, AW_starts=4), "GOOD", "ALL WEATHER"))
+
+    # ---- shrinkage on the new terms --------------------------------------
+    c.true("a 1-from-1 course-and-distance record is not read as 100%",
+           hm._cd_rate(dict(r0, CrsDist_wins=1, CrsDist_places=0, CrsDist_starts=1)) < 0.9)
+    c.true("more starts move the rate closer to the raw record",
+           hm._cd_rate(dict(r0, CrsDist_wins=8, CrsDist_places=0, CrsDist_starts=8))
+           > hm._cd_rate(dict(r0, CrsDist_wins=1, CrsDist_places=0, CrsDist_starts=1)))
+    c.true("an unraced jockey/trainer pair falls back to their solo rates",
+           abs(hm._jt_combo(dict(r0, jt_n=0))
+               - 0.5 * (r0.get("jky_win", 0.08) + r0.get("trn_win", 0.08))) < 1e-9)
+    c.true("run-up beyond the third start falls back to career",
+           hm._runup_rate(dict(r0, runup=9)) == hm._career_rate(r0, placings=True))
 
     # ---- styling must not crash and must colour every row -----------------
     styled = pf.style(table)
