@@ -8,6 +8,7 @@ import streamlit as st
 
 import harness_model as model
 import harness_parser as parser
+import place_finder as pf
 
 st.set_page_config(page_title="HarnessPredict", page_icon="🏇",
                    layout="wide", initial_sidebar_state="expanded")
@@ -133,15 +134,39 @@ with st.sidebar:
     sims = st.slider("Finishing-order simulations", 5_000, 60_000, 20_000, 5_000)
     seed = st.number_input("Random seed", value=42, step=1)
     st.divider()
+    st.subheader("Place Finder criteria")
+    place_max = st.slider(
+        "Maximum selections", 1, 5, pf.DEFAULT_MAX_PICKS, 1,
+        help="Hard cap on how many runners are flagged. Anything that clears "
+             "every filter beyond the cap is shown as a reserve.")
+    place_market_top = st.slider(
+        "Market must rate inside its top", 1, 8, pf.DEFAULT_MARKET_TOP, 1,
+        help="Requiring the market to agree was the biggest single lift when "
+             "this was measured on thoroughbreds. Set to the field size to "
+             "switch the consensus gate off.")
+    place_top_n = st.slider(
+        "Model shortlist to draw from", 3, 8, pf.DEFAULT_TOP_N, 1,
+        help="The pool the consensus is drawn from.")
+    place_fm_max = st.slider(
+        "Exclude F/M at or above", 1.0, 99.0, pf.DEFAULT_FM_MAX, 0.5,
+        help="OFF by default. The 2.0 figure that works on thoroughbreds has no "
+             "harness evidence behind it, so it is not applied here unless you "
+             "choose to. The F/M column is shown either way.")
+    place_shrink = st.slider(
+        "Shrink toward base rate", 0.0, 0.5, pf.DEFAULT_SHRINK, 0.05,
+        help="Pulls place probabilities toward places/runners, trimming "
+             "over-confidence at the top and lifting it at the bottom. "
+             "0 = raw model.")
+    st.divider()
     st.caption(
         "Fundamentals: mile-rate speed → tactical pace/gate → track & distance "
         "→ recent form → driver/trainer connections → official rating → "
         "sectionals → steward reliability → freshness.")
     st.caption("Prediction is probabilistic decision support, not a guaranteed outcome.")
 
-paste_tab, parsed_tab, speed_tab, pred_tab, explain_tab, method_tab = st.tabs(
+paste_tab, parsed_tab, speed_tab, pred_tab, place_tab, explain_tab, method_tab = st.tabs(
     ["1 · Paste Data", "2 · Parsed Data", "3 · Speed Map", "4 · Prediction",
-     "5 · Explanations", "Method"])
+     "5 · Place Finder", "6 · Explanations", "Method"])
 
 with paste_tab:
     st.subheader("Paste the full Racing & Sports harness Enhanced Form page")
@@ -275,6 +300,84 @@ with pred_tab:
                     df.to_csv(index=False).encode("utf-8"),
                     file_name=f"{h.get('track','race')}_R{h.get('race_no','')}_harness.csv",
                     mime="text/csv")
+
+with place_tab:
+    runners = st.session_state["runners"]
+    result = st.session_state["result"]
+    if not runners:
+        st.info("Parse a race in **1 · Paste Data** first.")
+    elif not result:
+        st.info("Run the prediction in **4 · Prediction** first — the place table "
+                "is built from the same finishing-order simulation.")
+    else:
+        active = result["runners"]
+        st.subheader("Place Finder")
+        auto = pf.places_paid(len(active))
+        c1, _ = st.columns([1, 3])
+        places = c1.selectbox(
+            "Places paid", [0, 1, 2, 3, 4],
+            index=[0, 1, 2, 3, 4].index(auto),
+            help="Defaults to standard terms: 3 places for 8+ runners, 2 for 5-7, "
+                 "none under 5. Override if your bookmaker differs.")
+        with st.expander("Optional: enter place odds to price the bets"):
+            st.caption("Edge = adjusted place probability × your price − 1.")
+            po_text = st.text_input(
+                "Place odds as `tab:price` pairs", value="",
+                placeholder="e.g. 7:1.40, 4:1.90, 1:3.20")
+        place_odds = {}
+        for chunk in po_text.replace(";", ",").split(","):
+            if ":" in chunk:
+                t, _, o = chunk.partition(":")
+                try:
+                    place_odds[int(t.strip())] = float(o.strip())
+                except ValueError:
+                    pass
+        if po_text and not place_odds:
+            st.warning("Could not read any `tab:price` pairs from that text.")
+
+        table, meta = pf.build(active, result, top_n=int(place_top_n),
+                               market_top=int(place_market_top),
+                               max_picks=int(place_max), fm_max=float(place_fm_max),
+                               shrink=float(place_shrink), places=int(places),
+                               place_odds=place_odds or None)
+        if meta["no_place_market"]:
+            st.warning(pf.summary_line(meta))
+        else:
+            st.caption(pf.summary_line(meta))
+
+        picks = table[table["Status"] == pf.STATUS_QUALIFY]
+        if len(picks):
+            names = " · ".join(
+                f'#{int(row["Tab"])} {row[pf.RUNNER_LABEL]} ({row["Place% (adj)"]:.1f}%)'
+                for _, row in picks.iterrows())
+            st.markdown(
+                f'<div class="pick"><div class="muted">PLACE SELECTIONS</div>'
+                f'<div style="font-size:1.05rem;margin-top:.3rem">{names}</div></div>',
+                unsafe_allow_html=True)
+        else:
+            st.info("No runner met all the criteria in this race. That is a real "
+                    "answer, not a failure — a race where the model and the market "
+                    "disagree is one to leave alone.")
+
+        st.dataframe(pf.style(table), width="stretch", hide_index=True)
+        st.caption(
+            "🟩 **SELECTION** — in the model's shortlist, rated inside the market's "
+            "top group, within the cap.  🟦 **reserve** — cleared everything but "
+            "fell outside the cap.  🟨 **excluded**.  ⬜ outside the model shortlist.  "
+            "**Fair place $** is 1 ÷ adjusted place probability — only bet when the "
+            "actual place market pays more than that.")
+        st.warning(
+            "These criteria were **measured on thoroughbred racing** (one meeting, "
+            "six races, 16 placegetters) and transplanted here. The consensus gate "
+            "and the shrink are structural and should travel; the F/M threshold is "
+            "a thoroughbred number and ships **switched off**. Nothing here is "
+            "validated on harness racing yet.")
+        st.download_button(
+            "Download place table as CSV",
+            table.to_csv(index=False).encode("utf-8"),
+            file_name=f"{st.session_state['header'].get('track','race')}"
+                      f"_R{st.session_state['header'].get('race_no','')}_places.csv",
+            mime="text/csv")
 
 with explain_tab:
     result = st.session_state["result"]

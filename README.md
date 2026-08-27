@@ -17,8 +17,10 @@ value flags.
   clipboard format.
 - `harness_model.py` — mile-rate speed, tactical pace map, connections and
   official rating, blended with the market and simulated to a finishing order.
+- `place_finder.py` — placegetter shortlist and criteria (see below).
 - `app.py` — Streamlit UI.
-- `test_parser.py` + `tests_fixture_gloucesterpark_r2.txt` — regression suite.
+- `test_parser.py` + `tests_fixture_gloucesterpark_r2.txt` — parser regression suite.
+- `test_place_finder.py` — Place Finder regression suite.
 
 ## What was wrong with the old parser
 
@@ -81,6 +83,44 @@ Betfair prices are parsed and displayed, but the model's market term currently
 uses the **TAB price only** — adding an exchange blend would be a deliberate
 recalibration, not a free win.
 
+## Place Finder
+
+A tab that shortlists and colour-codes probable placegetters. The criteria were
+**measured on thoroughbred racing** (one Wolverhampton card — six races, 16
+placegetters) and transplanted here, so they are split by how well they should
+travel.
+
+**Kept on, because the reasoning is structural**
+
+| Rule | Why |
+|---|---|
+| Require the market to agree — model top 5 ∩ market top 3 | The biggest single lift there: precision 33.3% → 47.1% at the same ~3 picks. Betting markets being hard to beat is not a thoroughbred peculiarity |
+| Cap at 3 selections | Coverage is not the goal; a shortlist you can bet is. Overflow shows as a reserve, not dropped |
+| Use the right place count | A top-3 probability overstates the real chance when only two places pay, so the app switches to `Top2%` itself |
+| Shrink toward the base rate | Pulls toward `places / runners`, trimming over-confidence at the top and lifting it at the bottom, with no curve fitted to a small sample |
+
+**Shipped off, because the number is thoroughbred-specific**
+
+| Rule | Why not |
+|---|---|
+| Exclude F/M ≥ 2.0× | On that card such horses placed 1 time in 20 — but there is **no harness evidence** for that threshold. The slider is there if you want it; the F/M column is shown either way |
+
+F/M is fundamental ÷ market probability. The harness model does not return it
+directly, so it is derived as `p_fund / p_mkt`.
+
+Rows are colour-coded — 🟩 selection, 🟦 reserve, 🟨 excluded, ⬜ outside the model
+shortlist. **Fair place $ = 1 ÷ adjusted place probability**; enter real place
+odds as `tab:price` pairs to get an edge per runner.
+
+> **Scratchings.** `predict()` filters them itself and `result["order"]` indexes
+> its own active list, so the table is built from `result["runners"]` rather than
+> whatever the caller passed. Getting that wrong would shift every row by one in
+> any race with a scratching — the Gloucester Park fixture has two, and the test
+> suite pins it.
+
+**Nothing here is validated on harness racing yet.** It is a sensible starting
+method borrowed from a neighbouring code, and the app says so on the tab.
+
 ## Run locally
 
 ```bash
@@ -98,6 +138,16 @@ python test_parser.py
 ```
 
 Expect `PASS 205  FAIL 0`. Run it whenever Racing & Sports change their markup.
+
+The Place Finder has its own suite covering the place-terms rule, the derived
+F/M ratio, the shrink behaviour, the consensus gate and cap, and — most
+importantly — that a race with scratchings stays index-aligned with the model:
+
+```bash
+python test_place_finder.py
+```
+
+Expect `PASS 60  FAIL 0`.
 
 ## Deploy (Streamlit Community Cloud)
 
