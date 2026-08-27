@@ -8,6 +8,8 @@ import streamlit as st
 
 import horse_model as model
 import horse_parser as parser
+import form_model as fm
+import meeting_parser as mp
 import place_finder as pf
 import race_quality as rq
 import results_log as rl
@@ -166,9 +168,10 @@ with st.sidebar:
         "finish → freshness → R&S ratings.")
     st.caption("Prediction is probabilistic decision support, not a guaranteed outcome.")
 
-paste_tab, parsed_tab, pred_tab, place_tab, results_tab, explain_tab, method_tab = st.tabs(
+(paste_tab, parsed_tab, pred_tab, place_tab, form_tab, results_tab,
+ explain_tab, method_tab) = st.tabs(
     ["1 · Paste Data", "2 · Parsed Data", "3 · Prediction", "4 · Place Finder",
-     "5 · Results & Tuning", "6 · Explanations", "Method"])
+     "5 · Form Score", "6 · Results & Tuning", "7 · Explanations", "Method"])
 
 st.session_state.setdefault("ledger", rl.empty_ledger())
 
@@ -390,6 +393,151 @@ with place_tab:
                 st.success(f"Logged **{rl.race_id(st.session_state['header'])}**. "
                            "Enter the finishing order in **5 · Results & Tuning** "
                            "once the race is run.")
+
+
+with form_tab:
+    st.subheader("Form Score — whole meeting, from a spreadsheet")
+    st.caption(
+        "Upload one or more Racing & Sports meeting files "
+        "(`<date>-<TRACK>-T.xlsx`) to score every race on the card. A separate "
+        "input path to the paste tabs: it reads form only, because **that "
+        "export contains no prices at all**.")
+
+    ups = st.file_uploader("Meeting files", type=["xlsx"],
+                           accept_multiple_files=True, key="form_upload")
+    if not ups:
+        st.info("Upload a meeting file to begin. Nothing on this tab depends "
+                "on the paste tabs.")
+    else:
+        rows, problems = [], []
+        for up in ups:
+            try:
+                raw = pd.read_excel(up, header=None)
+                rows += mp.parse_grid(raw, mp.track_name(up.name),
+                                      mp.meeting_date(up.name))
+            except Exception as exc:                      # noqa: BLE001
+                problems.append(f"{up.name}: {type(exc).__name__} — {exc}")
+        for msg in problems:
+            st.error(msg)
+
+        card = mp.to_frame(rows)
+        if card.empty:
+            st.error("No runners could be read. The expected layout is stacked "
+                     "race blocks, each with a `Tab` header row.")
+        else:
+            st.success(f"Read **{len(card)} runners** across "
+                       f"**{card.race_id.nunique()} races** from "
+                       f"{len(ups)} file(s).")
+            for w in mp.warnings_for(card):
+                st.warning(w)
+
+            ids = mp.races(card)
+            labels = {}
+            for rid in ids:
+                g = card[card.race_id == rid]
+                labels[rid] = "{} R{} — {} runners".format(
+                    g["track"].iloc[0], int(g["race"].iloc[0]), len(g))
+            pick = st.selectbox("Race", ids, format_func=lambda r: labels[r])
+            g = card[card.race_id == pick]
+
+            auto = fm.places_paid(len(g))
+            c1, c2 = st.columns([1, 3])
+            places = c1.selectbox("Places paid", [1, 2, 3, 4],
+                                  index=[1, 2, 3, 4].index(auto),
+                                  key="form_places")
+            meta = g.iloc[0]
+            dist_txt = "" if pd.isna(meta["dist"]) else str(int(meta["dist"])) + "m"
+            c2.markdown("**{}**  \n{} · {} {} · {} runners · {} place(s) paid".format(
+                meta["race_name"] or "", dist_txt, meta["surface"] or "?",
+                meta["going"] or "", len(g), places))
+
+            table = fm.rate_race(g, places=int(places))
+            top = table.iloc[0]
+            st.markdown(
+                '<div class="pick"><div class="muted">TOP RATED ON FORM</div>'
+                '<h2 style="margin:.15rem 0">#{} · {}</h2>'
+                '<b>Form score {:.0f}</b> · Win {:.1f}% · Place {:.1f}%</div>'.format(
+                    int(top["Tab"]), top["Horse"], top["Form score"],
+                    top["Win%"], top["Place%"]),
+                unsafe_allow_html=True)
+
+            top3 = " · ".join(
+                "#{} {}".format(int(r["Tab"]), r["Horse"])
+                for _, r in table.head(3).iterrows())
+            st.info(
+                "**Top three on form: {}** — read these as a group, not an "
+                "order. Over the {} races this was measured on, the 1st, 2nd "
+                "and 3rd rated horses won {:.0f}%, {:.0f}% and {:.0f}% — the "
+                "same to within the margin of error — while rank 4 fell to "
+                "{:.0f}%.".format(
+                    top3, fm.MEASURED["races"],
+                    100 * fm.RANK_STATS[1]["win"], 100 * fm.RANK_STATS[2]["win"],
+                    100 * fm.RANK_STATS[3]["win"], 100 * fm.RANK_STATS[4]["win"]))
+
+            st.dataframe(fm.style(table), width="stretch", hide_index=True)
+            st.caption(
+                "**Form score** is relative to today's field: 100 means top "
+                "rated here, not good in absolute terms. **Win%** is "
+                "calibrated — across six probability bands the mean gap between "
+                "predicted and actual was 1.5 points. **Place%** runs a few "
+                "points generous above ~55%. **Fair $** is 1 ÷ probability: "
+                "only bet when the real market pays more than that.")
+
+            with st.expander("How this model was built, and what it is worth"):
+                st.markdown(
+                    "Scored on **{races} races** from 27 August 2026 across nine "
+                    "meetings in Australia, Britain and Ireland — {runners} "
+                    "runners.\n\n"
+                    "| | top pick wins | its top 3 place | winner in top 3 |\n"
+                    "|---|---|---|---|\n"
+                    "| dart throw | {bw:.1f}% | {bp:.1f}% | {bc:.1f}% |\n"
+                    "| this model | **{mw:.1f}%** | **{mp_:.1f}%** | "
+                    "**{mc:.1f}%** |\n\n"
+                    "**The weights are fixed, not fitted.** Fitting was tried "
+                    "first: a 28-feature conditional logit scored 16.9% — "
+                    "*worse* than several single columns — and gave negative "
+                    "weights to \"better record at this distance\". 65 races "
+                    "cannot identify 28 free parameters. Against 200 random "
+                    "weightings of the same columns these weights sit inside "
+                    "the spread, so the choice of **columns** does the work, "
+                    "not the exact numbers on them.\n\n"
+                    "**What 65 races cannot tell you.** Every rate above "
+                    "carries a 95% interval about ±10 points wide. The model "
+                    "clearly beats a dart throw. Whether it beats its own best "
+                    "single column — last-start beaten margin, 24.6% — is not "
+                    "resolvable here.\n\n"
+                    "**No odds are involved anywhere.** This export has no "
+                    "price column, so nothing on this tab is a claim about "
+                    "value or profit. It ranks horses on form; what you pay "
+                    "for them is a separate question this data cannot speak "
+                    "to.".format(
+                        races=fm.MEASURED["races"], runners=fm.MEASURED["runners"],
+                        bw=100 * fm.BASELINE["win"], bp=100 * fm.BASELINE["place"],
+                        bc=100 * fm.BASELINE["top3_has_winner"],
+                        mw=100 * fm.MEASURED["top1_win"],
+                        mp_=100 * fm.MEASURED["top3_place"],
+                        mc=100 * fm.MEASURED["top3_has_winner"]))
+
+            with st.expander("Top three in every race on the card"):
+                allr = []
+                for rid in ids:
+                    tt = fm.rate_race(card[card.race_id == rid])
+                    for _, r in tt.head(3).iterrows():
+                        allr.append({"Race": labels[rid], "Rank": int(r["Rank"]),
+                                     "Tab": int(r["Tab"]), "Horse": r["Horse"],
+                                     "Form score": r["Form score"],
+                                     "Win%": r["Win%"], "Place%": r["Place%"]})
+                st.dataframe(
+                    pd.DataFrame(allr).style.format(
+                        {"Form score": "{:.0f}", "Win%": "{:.1f}%",
+                         "Place%": "{:.1f}%"}),
+                    width="stretch", hide_index=True)
+
+            st.warning(
+                "Form ranking is not a profit claim. These are strike rates "
+                "from a single day's racing, and a horse that wins 21% of the "
+                "time is usually priced accordingly.")
+
 
 with results_tab:
     st.subheader("Results & Tuning")

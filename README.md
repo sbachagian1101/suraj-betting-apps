@@ -16,6 +16,8 @@ and produces market-anchored win probabilities, fair prices and value flags.
   clipboard format.
 - `horse_model.py` — Shin de-vig → conditional-logit fundamentals → Benter
   blend → discounted Plackett–Luce finishing-order simulation.
+- `meeting_parser.py` — reads the `<date>-<TRACK>-T.xlsx` meeting export.
+- `form_model.py` — form score and win probability, from form alone.
 - `race_quality.py` — grades the race itself before any runner is chosen.
 - `place_finder.py` — placegetter shortlist and criteria (see below).
 - `results_log.py` — results ledger, performance tracking and threshold tuner.
@@ -23,6 +25,7 @@ and produces market-anchored win probabilities, fair prices and value flags.
 - `test_parser.py` + `tests_fixture_tamworth_r4.txt` — parser regression suite.
 - `test_place_finder.py` — Place Finder regression suite.
 - `test_race_quality.py` — race-grading regression suite.
+- `test_form_model.py` — meeting parser and form model regression suite.
 - `test_results_log.py` — ledger and tuner regression suite.
 
 ## Parser design
@@ -125,6 +128,87 @@ independent — if you run the extended features, consider raising the F/M cut.
 
 Barrier position (`BP`) and the apprentice claim are parsed and displayed but are
 still **not** model features.
+
+## Form Score
+
+A second input path, and a second model. The paste tabs read a Racing & Sports
+Enhanced Form **page**; this tab reads a whole meeting from a
+`<date>-<TRACK>-T.xlsx` **spreadsheet** and scores every race on the card.
+
+### The one fact that shapes everything here
+
+**That export contains no market prices.** Not a missing column — there is no
+odds column in the format at all. Which means:
+
+- `race_quality` cannot be applied to these files: it grades on the favourite's
+  price, and there isn't one.
+- The model is necessarily fundamentals-only, and the earlier finding — that a
+  trained model could not out-rank the market — **does not apply**, because
+  there is no market here to lose to.
+- Nothing on the tab is a claim about value or profit.
+
+If you want anything price-aware, use the `<date>-<track>-rNN.xlsx` single-race
+export instead: 128 columns including `Best Fixed Odds`.
+
+### What it scored
+
+65 races from 27 August 2026 — nine meetings across Australia, Britain and
+Ireland, 712 runners, results taken from the published board.
+
+| | top pick wins | its top 3 place | winner in top 3 |
+|---|---|---|---|
+| dart throw | 9.2% | 25.6% | 33.8% |
+| **this model** | **21.5%** | **42.6%** | **55.4%** |
+
+Win probabilities are calibrated: across six probability bands the mean gap
+between predicted and actual was **1.5 points**, and the most confident band
+predicted 31.8% against 33.3% actual.
+
+### Read the top three as a group, not an order
+
+The firmest structural finding, and the one that should change how you use it:
+
+| form rank | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| win% | 21.5 | 16.9 | 16.9 | 12.3 | 3.1 |
+| place% | 44.6 | 43.1 | 40.0 | 24.6 | 20.0 |
+
+Ranks 1–3 are indistinguishable from each other; rank 4 falls away. The score
+resolves a *group of three*, not a ranking within it.
+
+### Why the weights are fixed rather than fitted
+
+Fitting was tried first and lost. A 28-feature conditional logit scored **16.9%**
+on top pick — *worse than half a dozen single columns* — and gave negative
+weights to "better record at this distance" and "better record on this surface".
+One cause for both: 65 races cannot identify 28 free parameters, so the fit
+chases noise and lands on signs that are physically backwards.
+
+The fixed weights cost less than they look. Against **200 random weightings** of
+the same 14 columns, they sit *inside* the spread on every measure (top-1 median
+0.200, range 0.169–0.246; these weights 0.215). Removing the single
+highest-weighted column entirely moves top-1 from 0.215 to 0.200. **The choice of
+columns does the work, not the numbers on them.**
+
+### Two things deliberately not done
+
+**No place-probability correction.** Plackett–Luce overstates the place chance at
+the top, and it does here — 0.62 predicted against 0.57 actual. The obvious fix
+is a shrink toward the base rate, so it was measured at six strengths:
+runner-weighted calibration error came out 0.038, 0.033, 0.035, 0.036, 0.030,
+0.032 for shrink 0.00→0.30. Non-monotonic, spanning half a point — noise, not
+signal. Picking the minimum would be tuning on the same 65 races it is scored
+against, so the figures ship uncorrected and the optimism is stated instead.
+
+**No claim it beats its best single column.** Last-start beaten margin used alone
+scores 24.6% against the model's 21.5%. Three races separate them at n=65. The
+model wins on placegetters (42.6% vs 35.4%) and on top-3 coverage, which is why
+it ships — but the honest statement is that it clearly beats a dart throw and
+nothing finer is resolvable yet.
+
+### Sample size
+
+65 races. Every rate above carries a 95% interval roughly ±10 points wide.
 
 ## Race Quality
 
@@ -329,6 +413,17 @@ python test_race_quality.py
 ```
 
 Expect `PASS 104  FAIL 0`.
+
+The meeting parser and form model have a suite that runs against a synthetic
+meeting built in the test file, plus the nine real meetings when they are on
+disk — so it still means something on a machine without the spreadsheets:
+
+```bash
+python test_form_model.py
+```
+
+Expect `PASS 105  FAIL 0` with the real files present, `PASS 92  FAIL 0`
+without.
 
 The ledger and tuner have their own suite. Its most important check is that
 `results_log.selections_for_race` agrees exactly with `place_finder.build`: the
