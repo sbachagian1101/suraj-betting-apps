@@ -9,6 +9,7 @@ import streamlit as st
 import horse_model as model
 import horse_parser as parser
 import place_finder as pf
+import race_quality as rq
 import results_log as rl
 
 st.set_page_config(page_title="HorsePredictor", page_icon=":horse_racing:",
@@ -284,6 +285,32 @@ with place_tab:
     else:
         active = [r for r in runners if not r.get("scratched")]
         st.subheader("Place Finder")
+
+        # Which race, before which runner. A full-strength model could not
+        # out-rank the market, but the gap between an easy race and a hard one
+        # is large and needs no model at all - so it is shown first.
+        quality = rq.assess(active, result)
+        box = {rq.PRIME: st.success, rq.STRONG: st.info,
+               rq.FAIR: st.warning, rq.SKIP: st.error}[quality["tier"]]
+        box(rq.headline(quality))
+        with st.expander(f"Why this race is graded **{quality['label']}** — "
+                         "and what that grade has been worth"):
+            st.markdown(rq.detail(quality))
+            st.markdown("**What each market pick has historically returned in "
+                        "races of this grade:**")
+            st.dataframe(
+                rq.summary_table(quality).style.format({
+                    "Historic win%": "{:.1f}%", "Historic place%": "{:.1f}%",
+                    "Typical $": "${:.2f}"}),
+                width="stretch", hide_index=True)
+            st.caption(
+                "These are **strike rates, not profit**. A favourite that places "
+                "78% of the time is usually priced to place about 78% of the "
+                "time; the grade tells you where the result is predictable, not "
+                "where it is profitable. Skipping the red grade is the single "
+                "biggest improvement available — it is a fifth of all races and "
+                "the one where the favourite places only half the time.")
+
         auto = pf.places_paid(len(active))
         c1, c2 = st.columns([1, 3])
         places = c1.selectbox(

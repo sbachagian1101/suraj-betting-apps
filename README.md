@@ -16,11 +16,13 @@ and produces market-anchored win probabilities, fair prices and value flags.
   clipboard format.
 - `horse_model.py` — Shin de-vig → conditional-logit fundamentals → Benter
   blend → discounted Plackett–Luce finishing-order simulation.
+- `race_quality.py` — grades the race itself before any runner is chosen.
 - `place_finder.py` — placegetter shortlist and criteria (see below).
 - `results_log.py` — results ledger, performance tracking and threshold tuner.
 - `app.py` — Streamlit UI.
 - `test_parser.py` + `tests_fixture_tamworth_r4.txt` — parser regression suite.
 - `test_place_finder.py` — Place Finder regression suite.
+- `test_race_quality.py` — race-grading regression suite.
 - `test_results_log.py` — ledger and tuner regression suite.
 
 ## Parser design
@@ -123,6 +125,69 @@ independent — if you run the extended features, consider raising the F/M cut.
 
 Barrier position (`BP`) and the apprentice claim are parsed and displayed but are
 still **not** model features.
+
+## Race Quality
+
+The Place Finder answers *which runner*. This answers the question that comes
+first: **is this a race where winners and placegetters can be found at all?**
+
+### Why it exists
+
+A full-strength LightGBM (117 features, within-race normalisation, trained on
+2,959 races and scored on races it had never seen) was a **worse ranker than the
+market price** at every depth:
+
+| finding the winner | top 1 | top 2 | top 3 |
+|---|---|---|---|
+| Market price | **0.370** | 0.534 | 0.664 |
+| Model, win-trained | 0.350 | 0.534 | **0.679** |
+| Model, place-trained | 0.324 | 0.522 | 0.667 |
+| Model, no market term | 0.287 | 0.492 | 0.632 |
+
+Placegetter precision told the same story — the market's top 3 contained 1.53
+placegetters on average, and no model beat it. There is no ranking edge here.
+
+What there *is* — and it is much larger than anything a model added — is the
+difference between **races**. Sorted by the favourite's price and the field
+size, the favourite's place strike rate runs from 78% down to 50%. That signal
+needs no training data at all: the price and the field size are already on the
+page.
+
+### The four grades
+
+Measured on the 1,480 most recent races, none used to fit anything:
+
+| Grade | Rule | Races | Fav wins | Fav places | Top 3 holds winner |
+|---|---|---|---|---|---|
+| 🟢 **PRIME** | favourite under $2.50 | 31% | **54.7%** | **78.3%** | 84.3% |
+| 🔵 **STRONG** | favourite under $4, 8–10 runners | 21% | 37.7% | 74.5% | 68.7% |
+| 🟡 **FAIR** | favourite under $4, other field sizes | 26% | 31.3% | 59.8% | 66.8% |
+| 🔴 **SKIP** | favourite $4 or longer | 21% | 22.6% | 50.0% | 50.6% |
+| — | *all races* | 100% | 38.2% | 66.6% | 69.3% |
+
+Checked across four successive time folds: the grade ordering held in 3 or 4 of
+4 folds on both win and place, and no fold reversed it.
+
+**Skipping the red grade is the single largest improvement available.** It is a
+fifth of all races and the one where the favourite places only half the time.
+
+### Two things this deliberately does not do
+
+**It does not use the model.** Adding "the form model also rates the favourite
+top 2" moved the place rate about one point while discarding 82 of 566 races —
+a difference the sample cannot separate from noise, and the win rate actually
+went the other way. The model's opinion is shown as a note on the tab, never as
+a gate.
+
+**It does not promise profit.** These are strike rates. A favourite that places
+78% of the time is usually priced to place about 78% of the time, and TAB's
+overround on this data was 1.244 — about 19.6 cents in the dollar. The grade
+tells you where the *result* is predictable, which is what it was asked for; it
+does not claim those races are profitable.
+
+Field size is not a difficulty measure on its own, which is why the bands are
+where they are: fields under 8 pay only **two** places, so their lower place
+rate is arithmetic rather than a warning.
 
 ## Place Finder
 
@@ -253,6 +318,17 @@ python test_place_finder.py
 ```
 
 Expect `PASS 65  FAIL 0`.
+
+The race grades have their own suite covering the tier boundaries, the price
+fallback chain and its 999 sentinel, and the internal consistency of the
+measured tables — a tier whose numbers drifted out of order would mislead
+quietly rather than fail loudly:
+
+```bash
+python test_race_quality.py
+```
+
+Expect `PASS 104  FAIL 0`.
 
 The ledger and tuner have their own suite. Its most important check is that
 `results_log.selections_for_race` agrees exactly with `place_finder.build`: the
