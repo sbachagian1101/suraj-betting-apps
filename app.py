@@ -13,6 +13,16 @@ import soccer_model as sm
 
 st.set_page_config(page_title="SoccerPredict", page_icon="⚽",
                    layout="wide", initial_sidebar_state="expanded")
+st.markdown('''
+<style>
+.betgreen {border:1px solid rgba(46,204,113,.75); background:rgba(46,204,113,.16);
+  border-radius:.8rem; padding:.85rem 1.1rem; margin:.5rem 0 .2rem;}
+.betyellow {border:1px solid rgba(241,196,15,.85); background:rgba(241,196,15,.16);
+  border-radius:.8rem; padding:.85rem 1.1rem; margin:.5rem 0 .2rem;}
+.bethead {font-size:1.35rem; font-weight:700; margin:0 0 .2rem;}
+.betwhy {opacity:.85; font-size:.9rem;}
+</style>
+''', unsafe_allow_html=True)
 st.markdown("""
 <style>
 .block-container {padding-top: 1.15rem; padding-bottom: 3rem;}
@@ -80,6 +90,15 @@ with st.sidebar:
         st.warning("xG + SoT weights above 0.9 leave almost no weight on actual goals.")
         w_sot = min(w_sot, 0.9 - w_xg)
     st.caption(f"Actual goals therefore carry weight **{max(0.0, 1 - w_xg - w_sot):.2f}**.")
+    st.divider()
+    st.header("Bet signal")
+    bet_threshold = st.slider(
+        "Minimum win probability", 0.30, 0.80, float(sm.BET_MIN_WIN_PROB), 0.01,
+        format="%.2f",
+        help="A signal needs the side's 1X2 probability strictly above this AND "
+             "the two most likely scorelines to agree. Green: both top scores "
+             "are wins for that side. Yellow: the top score is a win but the "
+             "second is a draw.")
     st.divider()
     st.caption("Predictions are probabilistic decision support, not a guaranteed outcome.")
 
@@ -174,6 +193,42 @@ with predict_tab:
             f'Most likely outcome: <b>{best} ({100*probs.max():.1f}%)</b> · '
             f'most likely score <b>{pred["top_scorelines"][0][0]}–{pred["top_scorelines"][0][1]}</b> '
             f'({100*pred["top_scorelines"][0][2]:.1f}%)</div>', unsafe_allow_html=True)
+
+        sig = sm.bet_signal(pred, min_win_prob=float(bet_threshold))
+        if sig:
+            cls = "betgreen" if sig["level"] == sm.BET_GREEN else "betyellow"
+            tick = "\u2705" if sig["level"] == sm.BET_GREEN else "\u26a0\ufe0f"
+            st.markdown(
+                f'<div class="{cls}"><div class="bethead">{tick} Bet '
+                f'{sig["team"]}</div>'
+                f'<div class="betwhy">{sm.bet_signal_text(sig)}</div></div>',
+                unsafe_allow_html=True)
+            M = sm.BET_MEASURED
+            if sig["level"] == sm.BET_GREEN:
+                st.caption(
+                    f"On {M['matches']} walk-forward matches from the bundled "
+                    f"seasons, green fired {M['green_n']} times and the named "
+                    f"team won **{100*M['green_won']:.1f}%** of them — against "
+                    f"{100*M['over45_won']:.1f}% for backing every side the "
+                    f"model rates over 45%.")
+            else:
+                st.caption(
+                    f"**Yellow is a caution, not a weaker green.** On "
+                    f"{M['matches']} walk-forward matches it fired "
+                    f"{M['yellow_n']} times and the named team won only "
+                    f"**{100*M['yellow_won']:.1f}%** — below the "
+                    f"{100*M['yellow_model_said']:.1f}% the model itself gave "
+                    f"them, and **{100*M['yellow_drew']:.0f}%** of these matches "
+                    f"were drawn against {100*M['over45_drew']:.0f}% for >45% "
+                    f"sides generally. The draw in second place is a real "
+                    f"warning. n={M['yellow_n']} — treat it as a flag to look "
+                    f"closer, not a bet.")
+        elif max(pred["home_win"], pred["away_win"]) > float(bet_threshold):
+            st.info(
+                f"No bet signal: a side is above "
+                f"{100*float(bet_threshold):.0f}% but the two most likely "
+                f"scorelines do not confirm it. A draw as the *most* likely "
+                f"score is the distribution disagreeing with the 1X2 number.")
 
         st.markdown("### 1X2")
         cols = st.columns(3)

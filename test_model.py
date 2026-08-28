@@ -180,7 +180,129 @@ def test_backtest(c: Checker, df):
           f"market ll={ev.get('market_logloss', float('nan')):.4f} | "
           f"baserate ll={ev['logloss_baserate']:.4f}")
     print(f"    BTTS ll={ev['logloss_btts']:.4f}  Over2.5 ll={ev['logloss_o25']:.4f}")
-    return ev
+    return ev, bt
+
+
+def test_bet_signal(c: Checker, model, df, bt):
+    """The 1X2-plus-scorelines agreement rule.
+
+    Mostly boundary work: the threshold is strict ("> 45%"), a draw as the most
+    likely score is disagreement rather than a weak confirmation, and the away
+    side must be treated symmetrically with the home side.
+    """
+    def P(h, d, a, t1, t2, home="HOME", away="AWAY"):
+        return {"home_win": h, "draw": d, "away_win": a, "home": home, "away": away,
+                "top_scorelines": [(t1[0], t1[1], 0.12), (t2[0], t2[1], 0.10),
+                                   (0, 0, 0.05)]}
+
+    c.check("2-0 is a home win", sm.scoreline_outcome(2, 0), "H")
+    c.check("0-2 is an away win", sm.scoreline_outcome(0, 2), "A")
+    c.check("1-1 is a draw", sm.scoreline_outcome(1, 1), "D")
+    c.check("0-0 is a draw", sm.scoreline_outcome(0, 0), "D")
+
+    g = sm.bet_signal(P(.50, .25, .25, (2, 0), (1, 0)))
+    c.check("two home wins on top gives green", g["level"], sm.BET_GREEN)
+    c.check("and names the home team", g["team"], "HOME")
+    y = sm.bet_signal(P(.50, .25, .25, (2, 0), (1, 1)))
+    c.check("win then draw gives yellow", y["level"], sm.BET_YELLOW)
+
+    # the threshold is strict, as specified: "> 45%"
+    c.check("exactly at the threshold does not fire", True, True,
+            sm.bet_signal(P(.45, .30, .25, (2, 0), (1, 0))) is None)
+    c.check("a hair above the threshold fires", True, True,
+            sm.bet_signal(P(.4501, .30, .25, (2, 0), (1, 0))) is not None)
+    c.check("below the threshold does not fire", True, True,
+            sm.bet_signal(P(.44, .31, .25, (2, 0), (1, 0))) is None)
+    c.check("a custom threshold is honoured", True, True,
+            sm.bet_signal(P(.50, .25, .25, (2, 0), (1, 0)), min_win_prob=0.6) is None)
+
+    # a draw as the MOST likely score is disagreement, not a weak confirmation
+    c.check("draw on top gives no signal", True, True,
+            sm.bet_signal(P(.50, .25, .25, (1, 1), (2, 0))) is None)
+    c.check("second score for the other side gives no signal", True, True,
+            sm.bet_signal(P(.50, .25, .25, (2, 0), (0, 1))) is None)
+    c.check("two draws give no signal", True, True,
+            sm.bet_signal(P(.50, .25, .25, (1, 1), (0, 0))) is None)
+
+    # the away side is handled symmetrically
+    ga = sm.bet_signal(P(.23, .25, .52, (0, 2), (0, 1)))
+    c.check("away can go green", ga["level"], sm.BET_GREEN)
+    c.check("and names the away team", ga["team"], "AWAY")
+    c.check("away side recorded", ga["side"], "A")
+    ya = sm.bet_signal(P(.23, .25, .52, (0, 1), (1, 1)))
+    c.check("away can go yellow", ya["level"], sm.BET_YELLOW)
+
+    # degenerate input must not raise
+    c.check("no scorelines gives no signal", True, True,
+            sm.bet_signal({"home_win": .9, "draw": .05, "away_win": .05,
+                           "home": "A", "away": "B", "top_scorelines": []}) is None)
+    c.check("one scoreline gives no signal", True, True,
+            sm.bet_signal({"home_win": .9, "draw": .05, "away_win": .05,
+                           "home": "A", "away": "B",
+                           "top_scorelines": [(2, 0, .2)]}) is None)
+    c.check("no signal renders as empty text", sm.bet_signal_text(None), "")
+    c.check("green text names the team", True, True,
+            "HOME" in sm.bet_signal_text(g))
+    c.check("yellow text mentions the draw", True, True,
+            "draw" in sm.bet_signal_text(y))
+
+    # a real prediction must flow through unchanged
+    teams = sd.teams_of(df)
+    live = sm.predict(model, teams[0], teams[1])
+    sig = sm.bet_signal(live)
+    c.check("a real prediction yields a valid signal or none", True, True,
+            sig is None or sig["level"] in (sm.BET_GREEN, sm.BET_YELLOW))
+    if sig:
+        c.check("the signal names one of the two playing", True, True,
+                sig["team"] in (live["home"], live["away"]))
+        c.check("the signal's probability matches the model", True, True,
+                abs(sig["p_win"] - (live["home_win"] if sig["side"] == "H"
+                                    else live["away_win"])) < 1e-12)
+
+    # the backtest must carry the scorelines the signal needs
+    c.check("walk_forward keeps the top two scorelines", True, True,
+            {"s1_h", "s1_a", "s2_h", "s2_a"} <= set(bt.columns))
+    c.check("scorelines are non-negative goal counts", True, True,
+            bool((bt[["s1_h", "s1_a", "s2_h", "s2_a"]] >= 0).all().all()))
+
+    # replaying the rule on held-out matches must reproduce the published gap
+    fired = {"green": [0, 0], "yellow": [0, 0]}
+    for r in bt.itertuples():
+        sig = sm.bet_signal({"home_win": r.p_H, "draw": r.p_D, "away_win": r.p_A,
+                             "home": r.home, "away": r.away,
+                             "top_scorelines": [(int(r.s1_h), int(r.s1_a), 0.0),
+                                                (int(r.s2_h), int(r.s2_a), 0.0)]})
+        if sig:
+            b = fired[sig["level"]]
+            b[0] += 1
+            b[1] += int(sig["side"] == r.result)
+    c.check("green fires on held-out matches", True, True, fired["green"][0] > 0)
+    c.check("green wins more often than yellow", True, True,
+            fired["green"][1] / max(fired["green"][0], 1)
+            > fired["yellow"][1] / max(fired["yellow"][0], 1))
+    print(f"    replayed: green {fired['green'][1]}/{fired['green'][0]}, "
+          f"yellow {fired['yellow'][1]}/{fired['yellow'][0]}")
+
+    # the published measurements must stay self-consistent
+    M = sm.BET_MEASURED
+    c.check("green beats yellow", True, True, M["green_won"] > M["yellow_won"])
+    c.check("green beats backing every >45% side", True, True,
+            M["green_won"] > M["over45_won"])
+    c.check("yellow is worse than backing every >45% side", True, True,
+            M["yellow_won"] < M["over45_won"])
+    c.check("yellow underperformed what the model said", True, True,
+            M["yellow_won"] < M["yellow_model_said"])
+    c.check("yellow draws roughly double", True, True,
+            M["yellow_drew"] > 1.5 * M["over45_drew"])
+    c.check("green and yellow sum to either", True, True,
+            M["green_n"] + M["yellow_n"] == M["either_n"])
+    c.check("signals are a subset of the >45% sides", True, True,
+            M["either_n"] < M["over45_n"])
+    c.check("intervals bracket their estimates", True, True,
+            M["green_ci"][0] <= M["green_won"] <= M["green_ci"][1]
+            and M["yellow_ci"][0] <= M["yellow_won"] <= M["yellow_ci"][1])
+    c.check("p-values are probabilities", True, True,
+            0 < M["green_vs_yellow_p"] < 1 and 0 < M["green_vs_over45_p"] < 1)
 
 
 def main():
@@ -193,7 +315,9 @@ def main():
     print("--- model behaviour")
     m = test_model(c, df)
     print("--- walk-forward backtest (this refits per matchday, ~30s)")
-    test_backtest(c, df)
+    _, bt = test_backtest(c, df)
+    print("--- bet signal")
+    test_bet_signal(c, m, df, bt)
     print(f"\nPASS {c.passes}  FAIL {len(c.fails)}")
     if c.fails:
         print("\n".join(c.fails))

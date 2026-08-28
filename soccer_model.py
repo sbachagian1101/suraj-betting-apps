@@ -216,6 +216,106 @@ def top_scorelines(m: np.ndarray, n: int = 8) -> list[tuple[int, int, float]]:
     return flat[:n]
 
 
+BET_MIN_WIN_PROB = 0.45
+BET_GREEN = "green"
+BET_YELLOW = "yellow"
+
+# Measured by replaying the rule on 429 walk-forward predictions from the three
+# bundled Latvian Virsliga seasons - each match predicted by a model fitted only
+# on earlier matches, so nothing saw its own result.
+#
+# The comparison that matters is the last row: backing every side the model
+# already rates over 45%. The signal is only worth having if it beats that.
+BET_MEASURED = dict(
+    matches=429,
+    green_n=187, green_won=0.802, green_ci=(0.739, 0.853),
+    green_model_said=0.751, green_drew=0.107,
+    yellow_n=34, yellow_won=0.471, yellow_ci=(0.315, 0.633),
+    yellow_model_said=0.540, yellow_drew=0.294,
+    either_n=221, either_won=0.751,
+    over45_n=302, over45_won=0.709, over45_drew=0.146,
+    green_vs_yellow_p=0.000137, green_vs_over45_p=0.0249,
+)
+
+
+def scoreline_outcome(home_goals: int, away_goals: int) -> str:
+    """'H', 'D' or 'A' for a scoreline."""
+    if home_goals > away_goals:
+        return "H"
+    if home_goals < away_goals:
+        return "A"
+    return "D"
+
+
+def bet_signal(pred: dict[str, Any], min_win_prob: float = BET_MIN_WIN_PROB):
+    """Agreement between the 1X2 view and the two most likely scorelines.
+
+    Two conditions, both requiring the side's win probability to clear
+    `min_win_prob`:
+
+    * **green** - the top two scorelines are *both* wins for that side. The
+      shape of the distribution and the 1X2 number are saying the same thing.
+    * **yellow** - the top scoreline is a win for that side and the second is a
+      draw. The lead is there but the distribution's second-best guess is that
+      the team does not win.
+
+    Anything else returns None, including the case where the *most likely*
+    scoreline is a draw. That is deliberate: a draw at the top is the
+    distribution disagreeing with the 1X2 figure, which is the opposite of a
+    confirmation.
+
+    Both sides are tested. Two sides can only both clear 45% if the draw is
+    under 10%, which essentially never happens in football, but the check costs
+    nothing and green outranks yellow if it ever does.
+
+    This is a **presentation rule, not a model**: it re-reads numbers the model
+    already produced and adds no new information. See `README.md` for how it
+    scored on the bundled seasons.
+    """
+    tops = list(pred.get("top_scorelines") or [])
+    if len(tops) < 2:
+        return None
+    o1 = scoreline_outcome(tops[0][0], tops[0][1])
+    o2 = scoreline_outcome(tops[1][0], tops[1][1])
+
+    found = []
+    for side, key, name in (("H", "home_win", pred.get("home")),
+                            ("A", "away_win", pred.get("away"))):
+        p = float(pred.get(key, 0.0))
+        if not p > float(min_win_prob):
+            continue
+        if o1 == side and o2 == side:
+            level = BET_GREEN
+        elif o1 == side and o2 == "D":
+            level = BET_YELLOW
+        else:
+            continue
+        found.append({
+            "team": name, "side": side, "level": level, "p_win": p,
+            "top1": (tops[0][0], tops[0][1], tops[0][2]),
+            "top2": (tops[1][0], tops[1][1], tops[1][2]),
+            "min_win_prob": float(min_win_prob),
+        })
+    if not found:
+        return None
+    found.sort(key=lambda d: (d["level"] != BET_GREEN, -d["p_win"]))
+    return found[0]
+
+
+def bet_signal_text(sig: dict[str, Any] | None) -> str:
+    if not sig:
+        return ""
+    t1 = f'{sig["top1"][0]}\u2013{sig["top1"][1]}'
+    t2 = f'{sig["top2"][0]}\u2013{sig["top2"][1]}'
+    if sig["level"] == BET_GREEN:
+        why = (f'both of the two most likely scorelines ({t1}, {t2}) are '
+               f'{sig["team"]} wins')
+    else:
+        why = (f'the most likely scoreline ({t1}) is a {sig["team"]} win, but '
+               f'the second ({t2}) is a draw')
+    return f'Bet {sig["team"]} \u2014 {100 * sig["p_win"]:.1f}% to win, and {why}.'
+
+
 def predict(model: FittedModel, home: str, away: str,
             max_goals: int = MAX_GOALS) -> dict[str, Any]:
     lh, la = expected_goals(model, home, away)
@@ -281,6 +381,10 @@ def walk_forward(df: pd.DataFrame, xi: float = XI, reg: float = REG,
                 "p_H": p["home_win"], "p_D": p["draw"], "p_A": p["away_win"],
                 "p_btts": p["btts_yes"], "btts": int(m.hg > 0 and m.ag > 0),
                 "p_o25": p["over_25"], "o25": int(m.hg + m.ag > 2.5),
+                # the two most likely scorelines, so the bet signal can be
+                # replayed on held-out matches instead of only asserted
+                "s1_h": p["top_scorelines"][0][0], "s1_a": p["top_scorelines"][0][1],
+                "s2_h": p["top_scorelines"][1][0], "s2_a": p["top_scorelines"][1][1],
                 "odds_H": m.get("odds_ft_home_team_win", np.nan),
                 "odds_D": m.get("odds_ft_draw", np.nan),
                 "odds_A": m.get("odds_ft_away_team_win", np.nan),

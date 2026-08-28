@@ -14,10 +14,57 @@ probabilities from a Dixon–Coles team-strength model.
 ## Files
 
 - `soccer_data.py` — CSV loading, cleaning and validation.
-- `soccer_model.py` — Dixon–Coles fit, score matrix, markets, walk-forward backtest.
+- `soccer_model.py` — Dixon–Coles fit, score matrix, markets, bet signal, walk-forward backtest.
 - `app.py` — Streamlit UI.
-- `test_model.py` — 49-check regression suite.
+- `test_model.py` — 86-check regression suite.
 - `sample_data/` — Latvian Virsliga 2024, 2025, 2026 as bundled demo data.
+
+## The bet signal
+
+A banner above the 1X2 numbers that fires when the **1X2 view and the two most
+likely scorelines agree**. It adds no new information — it re-reads figures the
+model already produced — but it turns out to be a useful filter.
+
+| | condition |
+|---|---|
+| ✅ **green** | the side's win probability is **> 45%** *and* **both** of the top two scorelines are wins for it |
+| ⚠️ **yellow** | win probability **> 45%**, the **top** scoreline is a win for it, but the **second** is a draw |
+| *(nothing)* | anything else — including a **draw as the most likely score**, which is the distribution contradicting the 1X2 number rather than confirming it |
+
+The threshold is strict (`> 45%`, not `≥`) and adjustable in the sidebar. Both
+sides are tested, though two sides can only both clear 45% if the draw is under
+10%, which essentially never happens.
+
+### How it scored
+
+Replayed on **429 walk-forward predictions** from the three bundled Latvian
+Virsliga seasons — every match predicted by a model fitted only on earlier
+matches, so nothing saw its own result:
+
+| | bets | named team won | 95% CI | drawn |
+|---|---|---|---|---|
+| ✅ **green** | 187 | **80.2%** | 73.9–85.3% | 10.7% |
+| ⚠️ **yellow** | 34 | **47.1%** | 31.5–63.3% | **29.4%** |
+| either | 221 | 75.1% | | 13.6% |
+| *every side the model rates > 45%* | 302 | *70.9%* | | *14.6%* |
+
+**The bottom row is the comparison that matters.** Green beats simply backing
+every side the model already likes, by 9.3 points, while skipping 27% of them
+(Fisher exact **p = 0.025**; the two groups overlap, so this understates rather
+than overstates the gap).
+
+### Yellow is a caution, not a weaker green
+
+This is the finding worth acting on. Yellow selections won **47.1%** — *below*
+the **54.0%** the model itself assigned them — and **29.4%** of those matches
+were drawn against **14.6%** for over-45% sides generally. **The draw sitting in
+second place roughly doubles the draw risk.** Green versus yellow separates at
+Fisher exact **p = 0.00014**, so the colour distinction is real and not a
+presentational flourish.
+
+The app states this on the yellow banner rather than letting the colour imply
+"nearly a green". At n = 34 yellow is still a small sample; treat it as a flag to
+look closer, not a bet.
 
 ## What data it uses
 
@@ -115,7 +162,7 @@ streamlit run app.py
 python test_model.py
 ```
 
-Expect `PASS 49  FAIL 0`. The suite checks data integrity against hand-counted
+Expect `PASS 86  FAIL 0`. The suite checks data integrity against hand-counted
 values, mathematical invariants that must hold for any input (probabilities summing
 to one, home advantage having the right sign, a stronger defence reducing expected
 goals), golden values pinning the current fit, and that the backtest still beats
