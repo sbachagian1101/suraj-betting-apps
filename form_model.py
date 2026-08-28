@@ -43,6 +43,16 @@ predicted and actual was 0.015, and the most confident band predicted 0.318
 against 0.333 actual. Place probabilities are mildly optimistic at the top; see
 `DEFAULT_PLACE_SHRINK` for why nothing is done about that yet.
 
+## The red alert
+
+A separate, hand-specified filter sits on top of the ranking — see
+`RED_MIN_CAREER_RUNS` and the functions around `red_conditions`. It marks a
+shortlisted horse that is experienced, arriving in form, already race-fit and
+well ridden. It is **not** part of the score and is **not** validated: 65 races
+of results cannot establish whether the combination beats the top three on its
+own. It is a way of finding horses that match a stated profile, not evidence
+that the profile wins.
+
 ## Sample size
 
 65 races. Every rate here carries a 95% interval roughly ±10 points wide. Treat
@@ -120,6 +130,45 @@ MEASURED = dict(races=65, runners=712, top1_win=0.215, top3_place=0.426,
 DEFAULT_PLACE_SHRINK = 0.0
 DEFAULT_SIMS = 6000
 
+# ---------------------------------------------------------------------------
+# Red alert: a hand-specified filter applied WITHIN the top three on form.
+#
+# This is the user's rule, not a measured one. It marks a shortlisted horse that
+# is experienced, arriving in form, already race-fit, and well ridden:
+#
+#   1. more than 4 career starts
+#   2. placed (1st-3rd) at its last start
+#   3. has already had a run this preparation - i.e. not resuming
+#   4. its jockey is among the top 3 in the race by jockey rating
+#
+# All four must hold. It is a flag on top of the ranking, not part of the score,
+# and it has NOT been validated against results - there are only 65 races of
+# outcomes and 141 runners meet the first three conditions, far too few to say
+# whether the combination beats the top three on its own.
+RED_MIN_CAREER_RUNS = 4      # strictly more than this
+RED_MAX_LAST_FINISH = 3      # "placed" last start
+RED_TOP_JOCKEYS = 3          # jockey inside the race's top N by rating
+RED_WITHIN_TOP = 3           # only the top N on form are eligible
+
+# How the alert actually did on the 65 races that have results. Reported so the
+# rule can be watched, NOT as evidence that it works - see the caveats in the
+# app's Method tab. n=27 is far too small, and all 65 races are a single day.
+RED_MEASURED = dict(
+    alerts=27, alert_win=0.370, alert_place=0.630,
+    others=168, other_win=0.155, other_place=0.393,
+    win_p=0.0138, place_p=0.0345,
+    alert_win_ci=(0.215, 0.558), alert_place_ci=(0.442, 0.785),
+    other_win_ci=(0.108, 0.217), other_place_ci=(0.322, 0.468),
+    fired_in_races=29, of_races=73, share_of_shortlist=0.15,
+)
+
+RED_LABELS = {
+    "runs": "more than {n} career starts",
+    "placed": "placed at its last start",
+    "fit": "already had a run this preparation",
+    "jockey": "jockey in the race's top {n} by rating",
+}
+
 
 def places_paid(n_runners: int) -> int:
     """Standard terms: 3 places for 8+, 2 for 5-7, win only under 5."""
@@ -128,6 +177,60 @@ def places_paid(n_runners: int) -> int:
     if n_runners >= 5:
         return 2
     return 1
+
+
+def has_run_this_prep(form: Any) -> bool:
+    """True when the horse has already raced this preparation.
+
+    Racing & Sports form strings run **oldest to newest**, with `x` marking a
+    spell, so a trailing `x` means the most recent event was a break and the
+    horse resumes today. Verified two ways on the 27 August card:
+
+    * the rightmost digit matched the independent "last start" column for
+      **726 of 726** runners that had both;
+    * every one of the 105 horses whose form ends in `x` had been off for more
+      than 60 days (median 124), against none of the 626 that do not (median 17).
+
+    A horse with no figures at all is a first-starter, which also fails.
+    """
+    if not isinstance(form, str):
+        return False
+    if not any(ch.isdigit() for ch in form):
+        return False
+    return not form.rstrip().endswith("x")
+
+
+def jockey_rank(race: pd.DataFrame) -> np.ndarray:
+    """Rank the field by jockey rating, 1 = best. Higher rating is better.
+
+    Ties share the best rank, so in a race where seven jockeys are rated alike
+    they are all "top 3" - which is the honest answer, because in that race the
+    rating does not separate them. Unrated jockeys sort last rather than
+    accidentally winning the tie.
+    """
+    r = pd.to_numeric(race.get("jrat"), errors="coerce")
+    if r is None or r.isna().all():
+        return np.full(len(race), len(race) + 1, dtype=int)
+    return r.fillna(-np.inf).rank(ascending=False, method="min").to_numpy(dtype=int)
+
+
+def red_conditions(race: pd.DataFrame, *,
+                   min_runs: int = RED_MIN_CAREER_RUNS,
+                   max_last: int = RED_MAX_LAST_FINISH,
+                   top_jockeys: int = RED_TOP_JOCKEYS) -> pd.DataFrame:
+    """The four conditions, per runner, before the top-N restriction."""
+    race = race.reset_index(drop=True)
+    runs = pd.to_numeric(race.get("car_runs"), errors="coerce")
+    last = pd.to_numeric(race.get("ls_pos"), errors="coerce")
+    jr = jockey_rank(race)
+    return pd.DataFrame({
+        "runs": (runs > min_runs).fillna(False).to_numpy(dtype=bool),
+        "placed": (last <= max_last).fillna(False).to_numpy(dtype=bool),
+        "fit": np.array([has_run_this_prep(v) for v in race.get("Form L5",
+                                                                pd.Series(dtype=object))],
+                        dtype=bool),
+        "jockey": jr <= int(top_jockeys),
+    })
 
 
 def _z(frame: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
@@ -223,7 +326,11 @@ def why(race: pd.DataFrame, i: int, top: int = 3) -> str:
 
 def rate_race(race: pd.DataFrame, *, places: int | None = None,
               shrink: float = DEFAULT_PLACE_SHRINK,
-              sims: int = DEFAULT_SIMS, seed: int = 0) -> pd.DataFrame:
+              sims: int = DEFAULT_SIMS, seed: int = 0,
+              min_runs: int = RED_MIN_CAREER_RUNS,
+              max_last: int = RED_MAX_LAST_FINISH,
+              top_jockeys: int = RED_TOP_JOCKEYS,
+              within_top: int = RED_WITHIN_TOP) -> pd.DataFrame:
     """Score one race. Returns a table ranked best first.
 
     `race` must be the runners of a single race, one row each.
@@ -253,12 +360,57 @@ def rate_race(race: pd.DataFrame, *, places: int | None = None,
         "_raw": s,
     })
     out["Why"] = [why(race, i) for i in range(n)]
+
+    cond = red_conditions(race, min_runs=min_runs, max_last=max_last,
+                          top_jockeys=top_jockeys)
+    for c in cond.columns:
+        out["_c_" + c] = cond[c].to_numpy()
+    out["_jrank"] = jockey_rank(race)
+
     out = out.sort_values("_raw", ascending=False).reset_index(drop=True)
     out.insert(0, "Rank", np.arange(1, n + 1))
+
+    # The alert only applies inside the shortlist: a horse outside the top N is
+    # not a selection, so flagging it would be noise.
+    eligible = out["Rank"] <= int(within_top)
+    met = out[["_c_" + c for c in cond.columns]].all(axis=1)
+    out["Alert"] = np.where(eligible & met, "\U0001F534", "")
+    out["Checks"] = [
+        f"{int(m)}/4" if e else "—"
+        for m, e in zip(out[["_c_" + c for c in cond.columns]].sum(axis=1), eligible)]
+
     hist = out["Rank"].map(lambda r: RANK_STATS.get(int(r), {}).get("win"))
     out["Historic win% at this rank"] = [100 * v if v is not None else np.nan
                                          for v in hist]
     return out.drop(columns=["_raw"])
+
+
+def red_detail(table: pd.DataFrame, *, min_runs: int = RED_MIN_CAREER_RUNS,
+               top_jockeys: int = RED_TOP_JOCKEYS) -> pd.DataFrame:
+    """Condition-by-condition breakdown for the shortlisted runners."""
+    eligible = table[table["Checks"] != "—"]
+    rows = []
+    for _, r in eligible.iterrows():
+        rows.append({
+            "Rank": r["Rank"], "Tab": r["Tab"], "Horse": r["Horse"],
+            RED_LABELS["runs"].format(n=min_runs): "✅" if r["_c_runs"] else "❌",
+            RED_LABELS["placed"]: "✅" if r["_c_placed"] else "❌",
+            RED_LABELS["fit"]: "✅" if r["_c_fit"] else "❌",
+            RED_LABELS["jockey"].format(n=top_jockeys):
+                ("✅" if r["_c_jockey"] else "❌") + f"  (rated #{int(r['_jrank'])})",
+            "Alert": r["Alert"] or "—",
+        })
+    return pd.DataFrame(rows)
+
+
+def red_summary(table: pd.DataFrame) -> str:
+    hits = table[table["Alert"] != ""]
+    if hits.empty:
+        return ("No shortlisted runner meets all four alert conditions in this "
+                "race. That is the common case — across the 27 August card only "
+                "a minority of races produced one.")
+    names = " · ".join(f"#{int(r['Tab'])} {r['Horse']}" for _, r in hits.iterrows())
+    return f"🔴 **Alert: {names}** — meets all four conditions."
 
 
 def rate_meeting(df: pd.DataFrame, **kw) -> dict[str, pd.DataFrame]:
@@ -282,6 +434,11 @@ def summary_line(table: pd.DataFrame, meta: dict[str, Any] | None = None) -> str
 def style(table: pd.DataFrame):
     """Green for the top three, since that group is what the score resolves."""
     def row_colour(row):
+        if row.get("Alert"):
+            # Red outranks the green shortlist shading: an alert row is the one
+            # thing on the table the reader is meant to spot first.
+            return ["background-color: rgba(231, 76, 60, 0.30); "
+                    "font-weight: 600"] * len(row)
         if row["Rank"] <= 3:
             bg = "rgba(46, 204, 113, 0.22)"
         elif row["Rank"] <= 5:
@@ -294,4 +451,6 @@ def style(table: pd.DataFrame):
            "Fair win $": "${:.2f}", "Fair place $": "${:.2f}",
            "Historic win% at this rank": "{:.1f}%"}
     fmt = {k: v for k, v in fmt.items() if k in table.columns}
-    return table.style.apply(row_colour, axis=1).format(fmt, na_rep="—")
+    hide = [c for c in table.columns if c.startswith("_")]
+    st = table.style.apply(row_colour, axis=1).format(fmt, na_rep="—")
+    return st.hide(hide, axis="columns") if hide else st

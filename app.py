@@ -45,6 +45,23 @@ with st.sidebar:
                                  "probabilities and take slightly longer.")
     show_all = st.checkbox("Show every runner", value=True,
                            help="Off shows only the top six on form.")
+
+    st.divider()
+    st.subheader("Red alert")
+    st.caption("Marks a shortlisted horse meeting all four conditions.")
+    red_on = st.checkbox("Enable the red alert", value=True)
+    red_runs = st.number_input("More than N career starts", 0, 30,
+                               fm.RED_MIN_CAREER_RUNS, 1, disabled=not red_on)
+    red_last = st.number_input("Finished at least this well last start", 1, 6,
+                               fm.RED_MAX_LAST_FINISH, 1, disabled=not red_on)
+    red_jky = st.number_input("Jockey inside the race's top N by rating", 1, 10,
+                              fm.RED_TOP_JOCKEYS, 1, disabled=not red_on,
+                              help="Ties share the best rank, so where several "
+                                   "jockeys are rated alike they all count — "
+                                   "the rating genuinely does not separate "
+                                   "them in that race.")
+    red_top = st.number_input("Only apply within the top N on form", 1, 10,
+                              fm.RED_WITHIN_TOP, 1, disabled=not red_on)
     st.divider()
     st.markdown(
         f"**Measured on {fm.MEASURED['races']} races**\n\n"
@@ -117,8 +134,11 @@ with upload_tab:
             meta["race_name"] or "", dist_txt, meta["surface"] or "?",
             meta["going"] or "", len(g), places))
 
+        red_kw = dict(min_runs=int(red_runs), max_last=int(red_last),
+                      top_jockeys=int(red_jky),
+                      within_top=int(red_top) if red_on else 0)
         table = fm.rate_race(g, places=int(places), shrink=float(shrink),
-                             sims=int(sims))
+                             sims=int(sims), **red_kw)
         top = table.iloc[0]
         st.markdown(
             '<div class="pick"><div class="muted">TOP RATED ON FORM</div>'
@@ -140,8 +160,25 @@ with upload_tab:
                 100 * fm.RANK_STATS[1]["win"], 100 * fm.RANK_STATS[2]["win"],
                 100 * fm.RANK_STATS[3]["win"], 100 * fm.RANK_STATS[4]["win"]))
 
+        if red_on:
+            if (table["Alert"] != "").any():
+                st.error(fm.red_summary(table))
+            else:
+                st.caption(fm.red_summary(table))
+
         shown = table if show_all else table.head(6)
         st.dataframe(fm.style(shown), width="stretch", hide_index=True)
+
+        if red_on:
+            with st.expander("Red alert — condition by condition"):
+                st.dataframe(
+                    fm.red_detail(table, min_runs=int(red_runs),
+                                  top_jockeys=int(red_jky)),
+                    width="stretch", hide_index=True)
+                st.caption(
+                    f"All four must hold, and only the top {int(red_top)} on "
+                    "form are eligible — a horse outside the shortlist is not a "
+                    "selection, so flagging it would be noise.")
         st.caption(
             "**Form score** is relative to today's field — 100 means top rated "
             "here, not good in absolute terms. **Win%** is calibrated: across "
@@ -168,19 +205,30 @@ with card_tab:
         rows = []
         for rid in ids:
             g = card[card.race_id == rid]
-            t = fm.rate_race(g, shrink=float(shrink), sims=int(sims))
+            t = fm.rate_race(g, shrink=float(shrink), sims=int(sims),
+                             min_runs=int(red_runs), max_last=int(red_last),
+                             top_jockeys=int(red_jky),
+                             within_top=int(red_top) if red_on else 0)
             for _, r in t.head(depth).iterrows():
                 rows.append({
                     "Meeting": g["track"].iloc[0],
                     "Race": int(g["race"].iloc[0]),
                     "Rank": int(r["Rank"]), "Tab": int(r["Tab"]),
-                    "Horse": r["Horse"], "Form score": r["Form score"],
+                    "Horse": r["Horse"], "Alert": r["Alert"],
+                    "Form score": r["Form score"],
                     "Win%": r["Win%"], "Place%": r["Place%"],
                     "Fair win $": r["Fair win $"]})
         out = pd.DataFrame(rows)
+        if red_on:
+            n_alert = int((out["Alert"] != "").sum())
+            if n_alert and st.checkbox(
+                    f"Show only the {n_alert} red-alert runner(s)", value=False):
+                out = out[out["Alert"] != ""]
         st.dataframe(
             out.style.format({"Form score": "{:.0f}", "Win%": "{:.1f}%",
-                              "Place%": "{:.1f}%", "Fair win $": "${:.2f}"}),
+                              "Place%": "{:.1f}%", "Fair win $": "${:.2f}"})
+               .apply(lambda r: ["background-color: rgba(231,76,60,.30)"] * len(r)
+                      if r.get("Alert") else [""] * len(r), axis=1),
             width="stretch", hide_index=True, height=560)
         st.download_button(
             "Download this card as CSV", out.to_csv(index=False).encode("utf-8"),
@@ -191,6 +239,14 @@ with card_tab:
 # ---------------------------------------------------------------- method
 with method_tab:
     st.subheader("How this works, and what it is worth")
+    rr, rl, rj, rt = (fm.RED_MIN_CAREER_RUNS, fm.RED_MAX_LAST_FINISH,
+                      fm.RED_TOP_JOCKEYS, fm.RED_WITHIN_TOP)
+    R = fm.RED_MEASURED
+    ra, ro = R["alerts"], R["others"]
+    raw, rap = 100 * R["alert_win"], 100 * R["alert_place"]
+    row, rop = 100 * R["other_win"], 100 * R["other_place"]
+    rwp, rpp = R["win_p"], R["place_p"]
+    rsh, rfr, rof = 100 * R["share_of_shortlist"], R["fired_in_races"], R["of_races"]
     st.markdown(f"""
 ### The one fact that shapes everything
 
@@ -222,6 +278,50 @@ confident band predicted 31.8% against 33.3% actual.
 
 Ranks 1–3 are indistinguishable from each other; rank 4 falls away. The score
 resolves a **group of three**, not an order within it.
+
+### The red alert
+
+A separate, hand-specified filter that sits **on top of** the ranking. It marks
+a shortlisted horse that is experienced, arriving in form, already race-fit and
+well ridden — all four must hold:
+
+1. more than **{rr}** career starts
+2. **placed** (finished {rl} or better) at its last start
+3. has **already had a run this preparation** — not resuming from a spell
+4. its jockey is inside the race's **top {rj}** by jockey rating
+
+Only the top **{rt}** on form are eligible; a horse outside the shortlist is not
+a selection, so flagging it would be noise. All four thresholds are adjustable
+in the sidebar.
+
+*How "already had a run this preparation" is read:* Racing & Sports form strings
+run oldest to newest with `x` marking a spell, so a trailing `x` means the horse
+resumes today. Checked two ways on this card — the rightmost digit matched the
+independent last-start column for **726 of 726** runners, and every one of the
+105 horses whose form ends in `x` had been off more than 60 days (median 124)
+against none of the 626 that had not (median 17).
+
+#### What it did on the 65 races with results
+
+| within the top three | n | won | placed |
+|---|---|---|---|
+| **with the alert** | {ra} | **{raw:.1f}%** | **{rap:.1f}%** |
+| without it | {ro} | {row:.1f}% | {rop:.1f}% |
+
+Fisher exact two-sided **p = {rwp:.3f}** on wins, **p = {rpp:.3f}** on places.
+It fired on about {rsh:.0f}% of shortlisted runners, in {rfr} of {rof} races.
+
+**Read that as encouraging, not established.** Three reasons it is not proof:
+
+- **n = {ra}.** One race either way moves the win rate about four points.
+- **All 65 races are a single day.** Nothing here separates the rule from
+  "that Thursday suited experienced, in-form horses".
+- **The four conditions all correlate with simply being a good horse**, so part
+  of the gap is the rule re-finding what the form score already knew rather than
+  adding something to it.
+
+The honest use is to log results against it. If it holds up over a few hundred
+races, it means something.
 
 ### Why the weights are fixed, not fitted
 

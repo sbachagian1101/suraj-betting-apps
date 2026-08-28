@@ -18,7 +18,7 @@ pasted and nothing is typed.
 ## Files
 
 - `meeting_parser.py` — reads the stacked-race-block layout of the meeting export.
-- `form_model.py` — form score, win probability, place probability.
+- `form_model.py` — form score, win probability, place probability, red alert.
 - `app.py` — Streamlit UI: Upload, Whole Card, Method.
 - `test_form_model.py` — regression suite for both modules.
 
@@ -50,6 +50,61 @@ Ireland, 712 runners, results from the published board.
 Win probabilities are calibrated: across six probability bands the mean gap
 between predicted and actual was **1.5 points**, and the most confident band
 predicted 31.8% against 33.3% actual.
+
+## The red alert
+
+A hand-specified filter that sits **on top of** the ranking, marking a
+shortlisted horse that is experienced, arriving in form, already race-fit and
+well ridden. All four must hold:
+
+1. more than **4** career starts
+2. **placed** (1st–3rd) at its last start
+3. has **already had a run this preparation** — not resuming from a spell
+4. its jockey is inside the race's **top 3** by jockey rating
+
+Only the top **3** on form are eligible — a horse outside the shortlist is not a
+selection, so flagging it would be noise. Every threshold is adjustable in the
+sidebar, and the whole alert can be switched off.
+
+### How "already had a run this preparation" is read
+
+Racing & Sports form strings run **oldest to newest**, with `x` marking a spell,
+so a **trailing `x` means the horse resumes today**. This is the one reading that
+would silently invert the condition if wrong, so it was checked two ways on the
+27 August card:
+
+- the **rightmost digit matched the independent last-start column for 726 of
+  726** runners that had both;
+- **every one** of the 105 horses whose form ends in `x` had been off more than
+  60 days (median 124), against **none** of the 626 that had not (median 17).
+
+Jockey ties share the best rank, so where several jockeys are rated alike they
+all count as "top 3" — in that race the rating genuinely does not separate them.
+
+### What it did on the 65 races with results
+
+| within the top three | n | won | placed |
+|---|---|---|---|
+| **with the alert** | 27 | **37.0%** | **63.0%** |
+| without it | 168 | 15.5% | 39.3% |
+
+Fisher exact two-sided **p = 0.014** on wins, **p = 0.035** on places. It fired
+on about 15% of shortlisted runners, in 29 of 73 races.
+
+### Read that as encouraging, not established
+
+Three reasons it is not proof, all of which matter more than the p-values:
+
+- **n = 27.** One race either way moves the win rate about four points.
+- **All 65 races are a single day.** Nothing here separates the rule from
+  "that Thursday suited experienced, in-form horses".
+- **The four conditions all correlate with simply being a good horse**, so part
+  of the gap is the rule re-finding what the form score already knew rather than
+  adding to it.
+
+The honest use is to log results against it. If it holds up over a few hundred
+races, it means something. The app says all of this on its Method tab rather
+than presenting the rule as validated.
 
 ## Read the top three as a group, not an order
 
@@ -128,9 +183,15 @@ streamlit run app.py
 python test_form_model.py
 ```
 
-Expect `PASS 105  FAIL 0` when the nine 2026-08-27 meeting files are in
-`Downloads`, `PASS 92  FAIL 0` without them — the suite builds its own synthetic
-meeting so it still means something on a machine that has no spreadsheets.
+Expect `PASS 0` failures. The count varies with how many real meeting files
+are in `Downloads` — the suite builds its own synthetic meeting so it still
+means something on a machine that has none.
+
+The real-file checks are deliberately **structural** (every file yields a
+meeting, tabs run 1..n, runner count is the sum over races) rather than
+hardcoded totals. An earlier version asserted "nine meetings, 716 runners" and
+broke the moment a tenth meeting was downloaded — a property of the machine, not
+a regression in the parser.
 
 ## Deploy (Streamlit Community Cloud)
 

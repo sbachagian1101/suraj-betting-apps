@@ -194,6 +194,113 @@ def main():
            float(ft["Win%"].max() - ft["Win%"].min()) < 1e-6)
     c.true("and a mid form score", abs(float(ft["Form score"].iloc[0]) - 50.0) < 1e-6)
 
+    # ---- the red alert ----------------------------------------------------
+    # "already run this preparation": form runs oldest to newest, so a trailing
+    # x means the horse resumes today. Getting this backwards would invert the
+    # condition, so it is pinned hard.
+    c.true("a trailing x means resuming, not fit", not fm.has_run_this_prep("x604x"))
+    c.true("no trailing x means it has run", fm.has_run_this_prep("604"))
+    c.true("a spell in the middle is fine", fm.has_run_this_prep("5x880"))
+    c.true("one run since the spell counts", fm.has_run_this_prep("x1"))
+    c.true("a first-starter has not run", not fm.has_run_this_prep("-"))
+    c.true("an empty form has not run", not fm.has_run_this_prep(""))
+    c.true("a non-string has not run", not fm.has_run_this_prep(None))
+    c.true("trailing whitespace does not hide the x",
+           not fm.has_run_this_prep("31x "))
+
+    # jockey rank: higher rating is better, ties share the best rank
+    jr = pd.DataFrame({"jrat": [2.0, 3.5, 2.0, 1.0]})
+    c.check("best rating ranks 1", list(fm.jockey_rank(jr)), [2, 1, 2, 4])
+    c.true("ties share the better rank", fm.jockey_rank(jr)[0] == fm.jockey_rank(jr)[2])
+    allna = pd.DataFrame({"jrat": [None, None]})
+    c.true("a race with no ratings ranks everyone last",
+           bool((fm.jockey_rank(allna) > 2).all()))
+    somena = pd.DataFrame({"jrat": [None, 2.0]})
+    c.check("an unrated jockey sorts behind a rated one",
+            list(fm.jockey_rank(somena)), [2, 1])
+
+    # a race built so exactly one runner meets all four
+    race = df[df.race_id == df.race_id.iloc[0]].copy().reset_index(drop=True)
+    race["car_runs"] = [10, 10, 10, 2, 10, 10, 10]
+    race["ls_pos"] = [2, 9, 2, 2, 2, 2, 2]
+    race["Form L5"] = ["1234", "1234", "123x", "1234", "1234", "1234", "1234"]
+    race["jrat"] = [9.0, 8.0, 7.0, 6.0, 1.0, 1.0, 1.0]
+    cond = fm.red_conditions(race)
+    c.check("runner 0 meets all four", list(cond.iloc[0]), [True] * 4)
+    c.true("runner 1 fails only on last start",
+           not cond.iloc[1]["placed"] and cond.iloc[1]["runs"])
+    c.true("runner 2 fails only on fitness",
+           not cond.iloc[2]["fit"] and cond.iloc[2]["placed"])
+    c.true("runner 3 fails only on career starts",
+           not cond.iloc[3]["runs"] and cond.iloc[3]["placed"])
+    c.true("runner 4 fails only on the jockey",
+           not cond.iloc[4]["jockey"] and cond.iloc[4]["runs"])
+    c.check("exactly one runner meets all four", int(cond.all(axis=1).sum()), 1)
+
+    # thresholds must actually bite
+    c.check("raising the career bar excludes it",
+            int(fm.red_conditions(race, min_runs=50).all(axis=1).sum()), 0)
+    c.check("tightening the last-start rule excludes it",
+            int(fm.red_conditions(race, max_last=1).all(axis=1).sum()), 0)
+    c.check("tightening the jockey rule keeps the best-rated",
+            int(fm.red_conditions(race, top_jockeys=1).all(axis=1).sum()), 1)
+    c.true("widening the jockey rule can only add",
+           int(fm.red_conditions(race, top_jockeys=9).all(axis=1).sum())
+           >= int(fm.red_conditions(race, top_jockeys=1).all(axis=1).sum()))
+
+    # the alert must respect the top-N restriction
+    t_red = fm.rate_race(race, sims=800)
+    c.true("Alert column present", "Alert" in t_red.columns)
+    c.true("only the shortlist can be flagged",
+           bool((t_red[t_red["Alert"] != ""]["Rank"] <= fm.RED_WITHIN_TOP).all()))
+    c.check("within_top=0 disables the alert entirely",
+            int((fm.rate_race(race, within_top=0, sims=800)["Alert"] != "").sum()), 0)
+    wide = fm.rate_race(race, within_top=99, sims=800)
+    c.check("widening the shortlist finds the qualifier",
+            int((wide["Alert"] != "").sum()), 1)
+    c.true("Checks is blank outside the shortlist",
+           bool((t_red[t_red["Rank"] > fm.RED_WITHIN_TOP]["Checks"] == "—").all()))
+    c.true("Checks counts out of four inside it",
+           bool(t_red[t_red["Rank"] <= fm.RED_WITHIN_TOP]["Checks"]
+                .str.endswith("/4").all()))
+
+    # detail table and summary
+    det = fm.red_detail(t_red)
+    c.check("detail covers the shortlist", len(det), min(fm.RED_WITHIN_TOP, len(t_red)))
+    c.true("detail reports the jockey rank", any("rated #" in str(v)
+                                                 for v in det.iloc[0].tolist()))
+    c.true("summary mentions a flagged horse or says none",
+           ("Alert" in fm.red_summary(t_red)) or
+           ("No shortlisted runner" in fm.red_summary(t_red)))
+    none_t = fm.rate_race(race, min_runs=999, sims=800)
+    c.true("with no qualifier the summary says so",
+           "No shortlisted runner" in fm.red_summary(none_t))
+
+    # styling: red must win over the green shortlist shading, and the internal
+    # condition columns must never reach the rendered table
+    html = fm.style(wide).to_html()
+    c.true("red styling applied", "231, 76, 60" in html or "231,76,60" in html)
+    for hidden in ("_c_runs", "_c_placed", "_c_fit", "_c_jockey", "_jrank"):
+        c.true(f"{hidden} hidden from the rendered table", hidden not in html)
+    c.true("no-alert table still renders",
+           fm.style(fm.rate_race(race, within_top=0, sims=800)).to_html() is not None)
+
+    # the published alert numbers must stay self-consistent
+    R = fm.RED_MEASURED
+    c.true("alert win rate beats the rest", R["alert_win"] > R["other_win"])
+    c.true("alert place rate beats the rest", R["alert_place"] > R["other_place"])
+    c.true("placing is at least as common as winning, with the alert",
+           R["alert_place"] >= R["alert_win"])
+    c.true("alert sample is the smaller one", R["alerts"] < R["others"])
+    c.true("intervals bracket their estimates",
+           R["alert_win_ci"][0] <= R["alert_win"] <= R["alert_win_ci"][1]
+           and R["other_win_ci"][0] <= R["other_win"] <= R["other_win_ci"][1])
+    c.true("p-values are probabilities",
+           0 < R["win_p"] < 1 and 0 < R["place_p"] < 1)
+    c.true("alerts and others sum to the measured top three",
+           R["alerts"] + R["others"] == 195)
+    c.true("it fired in a minority of races", R["fired_in_races"] < R["of_races"])
+
     # ---- the published constants must stay self-consistent ----------------
     c.true("top-rated beats a dart throw",
            fm.RANK_STATS[1]["win"] > fm.BASELINE["win"])
@@ -215,23 +322,45 @@ def main():
 
     # ---- against the real meetings, when they are on disk ------------------
     if REAL:
+        # Structural assertions only. Hardcoding "nine meetings, 716 runners"
+        # made this suite depend on what happens to be sitting in a Downloads
+        # folder - it broke the moment a tenth meeting was added, which is a
+        # property of the machine, not a regression in the parser.
         real = mp.load(REAL)
-        c.check("all nine meetings parse", len(REAL), 9)
-        c.check("716 runners read", len(real), 716)
-        c.check("66 races read", real.race_id.nunique(), 66)
+        c.true("every file yielded at least one race",
+               real["track"].nunique() == len(REAL))
+        c.true("no parser warnings on real meetings", mp.warnings_for(real) == [])
         c.true("no runner lost to a blank name",
                bool(real.horse.astype(str).str.len().gt(0).all()))
-        c.true("every race has contiguous tabs", mp.warnings_for(real) == [])
+        c.true("every race has at least two runners",
+               bool(real.groupby("race_id").size().min() >= 2))
+        c.check("runner count is the sum over races", len(real),
+                int(real.groupby("race_id").size().sum()))
+        c.true("tabs run 1..n in every race",
+               all(sorted(int(t) for t in g.tab.dropna())
+                   == list(range(1, len(g) + 1))
+                   for _, g in real.groupby("race_id")))
+
         tables = fm.rate_meeting(real)
-        c.check("every race scored", len(tables), 66)
+        c.check("every race scored", len(tables), real.race_id.nunique())
         c.true("every race's win probabilities sum to 100",
                all(abs(v["Win%"].sum() - 100) < 1e-6 for v in tables.values()))
         c.true("no NaN form scores",
                all(v["Form score"].notna().all() for v in tables.values()))
         big = max(tables.values(), key=len)
-        c.true("the 26-runner field scores without trouble", len(big) >= 26)
+        c.true("the largest field scores without trouble", len(big) >= 20)
+
+        # The alert should be selective without being vanishingly rare.
+        fired = sum(int((v["Alert"] != "").sum()) for v in tables.values())
+        short = sum(min(fm.RED_WITHIN_TOP, len(v)) for v in tables.values())
+        c.true("the alert fires on a minority of the shortlist",
+               0 < fired < short * 0.5)
+        c.true("no race flags more than its shortlist",
+               all(int((v["Alert"] != "").sum()) <= fm.RED_WITHIN_TOP
+                   for v in tables.values()))
+
         # Races must group by meeting: sorting on race number alone would
-        # interleave the nine cards and make the selector unusable.
+        # interleave the cards and make the selector unusable.
         order = mp.races(real)
         tracks = [real[real.race_id == r]["track"].iloc[0] for r in order]
         runs = [t for i, t in enumerate(tracks) if i == 0 or t != tracks[i - 1]]
@@ -239,14 +368,18 @@ def main():
                 real.race_id.nunique())
         c.check("each meeting is one contiguous run, not interleaved",
                 len(runs), len(set(runs)))
-        c.check("all nine meetings present", len(set(runs)), 9)
+        c.check("every meeting appears", len(set(runs)), real["track"].nunique())
         for tk in sorted(set(tracks)):
             nums = [int(real[real.race_id == r]["race"].iloc[0])
                     for r in order
                     if real[real.race_id == r]["track"].iloc[0] == tk]
             c.check(f"{tk}: races ascend", nums, sorted(nums))
-        c.check("first race is the first meeting's race 1", order[0],
-                sorted(set(tracks))[0] + "_R1")
+        c.check("first race is the first meeting's earliest", order[0],
+                sorted(set(tracks))[0] + "_R"
+                + str(min(int(real[real.race_id == r]["race"].iloc[0])
+                          for r in order
+                          if real[real.race_id == r]["track"].iloc[0]
+                          == sorted(set(tracks))[0])))
 
     else:
         print("  (real meeting files not found — skipped those checks)")
