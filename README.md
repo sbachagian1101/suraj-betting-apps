@@ -31,6 +31,51 @@ market has absorbed team news the model cannot see. The flag says *look closer*,
 never *back this*. Tab 3 recomputes this from whatever data you load rather than
 asking you to take it on faith.
 
+## The recommendation
+
+The app names a bet, states a confidence, and explains itself. All three are
+grounded in measurement rather than invention.
+
+**The selection** is the model's most likely outcome.
+
+**The confidence** is a band whose label means something, because the model's
+stated probability and the realised rate line up:
+
+| model says | matches | actually won |
+|---|---|---|
+| 55%+ → **HIGH** | 156 | **63.5%** |
+| 45–55% → **MEDIUM** | 285 | **48.8%** |
+| under 45% → **LOW** | 281 | **41.6%** |
+
+Confidence is downgraded one step whenever the market names a different
+favourite, because on this league's history that is when the model is least
+reliable.
+
+**The reasons** are the actual drivers: the expected goals, where each side
+ranks in attack and defence, the fitted home advantage, how concentrated the
+scoreline distribution is, and whether the bookmaker agrees.
+
+### And it tells you the recommendation is not a bet
+
+Flat-staking each bucket over the same 723 matches:
+
+| bucket | matches | strike | ROI | 95% CI |
+|---|---|---|---|---|
+| agree, HIGH confidence | 273 | 57.5% | **−10.8%** | −20% to −1% |
+| agree, MEDIUM | 305 | 46.9% | −7.8% | −19% to +3% |
+| agree, LOW | 46 | 52.2% | +11.6% | −20% to +43% |
+| they disagree | 99 | 32.3% | −8.6% | −35% to +19% |
+| *back the favourite every week* | 723 | 51.0% | *−6.3%* | |
+
+Only the first row's interval clears zero, so it is the only bucket that
+**definitely** lost money; the rest establish nothing either way, and the app
+says exactly that rather than letting the one favourable-looking point estimate
+stand. The book's margin here is **7.7%** — larger than any edge the model has.
+
+So the recommendation names the most likely outcome and shows the expected
+return at your price. A 57.5% strike rate at short odds still loses. That is
+the honest shape of it.
+
 ## Where it stands
 
 Walk-forward on three Dutch seasons — refitted before every matchday, so no
@@ -115,7 +160,7 @@ goalless-chance game.
 - `soccer_model.py` — Dixon–Coles fit, score matrix, markets, walk-forward.
 - `assess.py` — per-league tuning, calibration, the disagreement flag.
 - `app.py` — Streamlit UI.
-- `test_model.py` — 104-check suite.
+- `test_model.py` — 151-check suite.
 - `sample_data/` — Dutch Eerste Divisie 2024-25, 2025-26, 2026-27.
 
 ## Run locally
@@ -131,7 +176,7 @@ streamlit run app.py
 python test_model.py
 ```
 
-Expect `PASS 104  FAIL 0`. The suite is deliberately **data-agnostic** — an
+Expect `PASS 151  FAIL 0`. The suite is deliberately **data-agnostic** — an
 earlier version hardcoded Latvian team names and golden log-loss values, so
 swapping the bundled league broke it for reasons unrelated to the code. It now
 asserts properties that hold for any league, including the claim the whole app

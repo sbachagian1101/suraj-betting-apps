@@ -259,6 +259,76 @@ def main():
     c.true("the named outcome is one of the three",
            far["outcome"] in far["model"])
 
+    # ---- the recommendation ----------------------------------------------
+    r = A.recommend(p, m, None)
+    c.true("a selection is named", r["selection"] in
+           (p["home"], "Draw", p["away"]))
+    c.true("the selection is the most likely outcome",
+           abs(r["probability"] - max(p["home_win"], p["draw"],
+                                      p["away_win"])) < 1e-12)
+    c.true("confidence is one of the three labels",
+           r["confidence"] in ("high", "medium", "low"))
+    c.true("fair odds are the reciprocal",
+           abs(r["fair_odds"] - 1 / r["probability"]) < 1e-6)
+    c.true("no price means no expected value", r["ev"] is None)
+    c.true("reasons are given", len(r["reasons"]) >= 4)
+    c.true("a reason cites the expected goals",
+           any("Expected goals" in x for x in r["reasons"]))
+    c.true("a reason cites home advantage",
+           any("Home advantage" in x for x in r["reasons"]))
+    c.true("without a price it says so",
+           any("No prices entered" in x for x in r["reasons"]))
+
+    # bands must map probability to the measured strike rate
+    for prob, want in ((0.70, "high"), (0.50, "medium"), (0.30, "low")):
+        lab, n_, strike = A.confidence_band(prob)
+        c.check(f"{prob:.0%} is {want} confidence", lab, want)
+        c.true(f"{want} carries a measured strike rate", 0.0 < strike < 1.0)
+        c.true(f"{want} carries a sample size", n_ > 50)
+    c.true("higher bands have higher realised strike rates",
+           A.confidence_band(0.70)[2] > A.confidence_band(0.50)[2]
+           > A.confidence_band(0.30)[2])
+
+    # expected value, and the downgrade when the market disagrees
+    fair_book = (1 / p["home_win"], 1 / p["draw"], 1 / p["away_win"])
+    r_fair = A.recommend(p, m, fair_book)
+    c.true("a fair book gives roughly zero expected value",
+           abs(r_fair["ev"]) < 0.02)
+    c.true("agreement is detected", r_fair["agrees_with_market"] is True)
+    short = list(fair_book)
+    short[r_fair["outcome_index"]] *= 0.5
+    r_short = A.recommend(p, m, tuple(short))
+    c.true("a shorter price lowers expected value", r_short["ev"] < r_fair["ev"])
+
+    flip = [1.02, 50.0, 50.0]
+    flip[r_fair["outcome_index"]] = 50.0
+    flip[(r_fair["outcome_index"] + 1) % 3] = 1.02
+    r_dis = A.recommend(p, m, tuple(flip))
+    c.true("a market naming another favourite is detected",
+           r_dis["agrees_with_market"] is False)
+    c.true("and confidence is downgraded",
+           ["low", "medium", "high"].index(r_dis["confidence"])
+           <= ["low", "medium", "high"].index(r_fair["confidence"]))
+    c.true("and a reason explains the downgrade",
+           any("different" in x for x in r_dis["reasons"]))
+
+    # the published bucket evidence must stay self-consistent
+    for key, b in A.BUCKET_ROI.items():
+        c.true(f"{key} has a sample size", b["n"] > 0)
+        c.true(f"{key} interval brackets its estimate",
+               b["ci"][0] <= b["roi"] <= b["ci"][1])
+        c.true(f"{key} is only called conclusive when the interval excludes zero",
+               b["conclusive"] == (b["ci"][0] < 0 and b["ci"][1] < 0))
+        c.true(f"{key} has a strike rate", 0.0 < b["strike"] < 1.0)
+    c.true("backing the favourite lost money", A.FAVOURITE_ROI["roi"] < 0)
+    c.true("the book carries a margin", A.FAVOURITE_ROI["overround"] > 1.0)
+    c.true("no confidence text promises profit",
+           not any(w in " ".join(A.CONFIDENCE_TEXT.values()).lower()
+                   for w in ("profit", "guaranteed", "edge", "value bet")))
+    for lvl in ("high", "medium", "low"):
+        c.true(f"{lvl} confidence has explanatory text",
+               len(A.CONFIDENCE_TEXT[lvl]) > 40)
+
     print(f"PASS {c.passes}  FAIL {len(c.fails)}")
     if c.fails:
         print("\n".join(c.fails))

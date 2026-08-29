@@ -199,8 +199,65 @@ with predict_tab:
                     unsafe_allow_html=True)
 
                 odds = (odds_h, odds_d, odds_a)
-                fl = A.flag(p, odds if min(odds) > 1.0 else None)
+                have_odds = min(odds) > 1.0
+                fl = A.flag(p, odds if have_odds else None)
                 mk = sm.devig_1x2(*odds) if fl else [float("nan")] * 3
+                rec = A.recommend(p, model, odds if have_odds else None)
+
+                # ---- the recommendation -------------------------------
+                tone = {"high": "#2ecc71", "medium": "#3498db",
+                        "low": "#f1c40f"}[rec["confidence"]]
+                ev_line = ""
+                if rec["ev"] is not None:
+                    ev_line = (f' · at ${rec["odds"]:.2f} the expected return is '
+                               f'<b>{100*rec["ev"]:+.1f}%</b>')
+                st.markdown(
+                    f'<div style="border:1px solid {tone}; background:{tone}1a; '
+                    f'border-radius:.8rem; padding:.9rem 1.2rem; margin:.5rem 0 .3rem">'
+                    f'<div class="muted">RECOMMENDATION · CONFIDENCE '
+                    f'{rec["confidence"].upper()}</div>'
+                    f'<h2 style="margin:.15rem 0">{rec["selection"]}</h2>'
+                    f'<b>{100*rec["probability"]:.1f}%</b> · fair price '
+                    f'<b>${rec["fair_odds"]:.2f}</b>{ev_line}</div>',
+                    unsafe_allow_html=True)
+
+                st.caption(A.CONFIDENCE_TEXT[rec["confidence"]])
+
+                with st.expander("**Why** — the reasoning behind this call",
+                                 expanded=True):
+                    for r_ in rec["reasons"]:
+                        st.markdown(f"- {r_}")
+                    b = rec["bucket"]
+                    if b:
+                        span = (f"{100*b['ci'][0]:+.0f}% to "
+                                f"{100*b['ci'][1]:+.0f}%")
+                        if b["conclusive"]:
+                            st.markdown(
+                                f"- **What this has been worth:** flat-staking "
+                                f"every pick in this bucket over {b['n']} "
+                                f"matches **lost {abs(100*b['roi']):.1f}%** "
+                                f"(95% CI {span} — clear of zero, so that is a "
+                                "real loss, not noise).")
+                        else:
+                            st.markdown(
+                                f"- **What this has been worth:** {b['n']} "
+                                f"matches, point estimate "
+                                f"{100*b['roi']:+.1f}%, but the interval spans "
+                                f"{span} — it crosses zero, so this bucket "
+                                "establishes nothing either way. Do not read "
+                                "the point estimate as a result.")
+                    st.markdown(
+                        f"- **The honest bottom line:** across every bucket "
+                        f"tested, flat-staking lost money. Backing the market "
+                        f"favourite every week returned "
+                        f"{100*A.FAVOURITE_ROI['roi']:+.1f}% against a "
+                        f"{100*(A.FAVOURITE_ROI['overround']-1):.1f}% book "
+                        "margin. This is a **view**, not an edge — the "
+                        "recommendation names the most likely outcome, which is "
+                        "not the same as a bet worth making.")
+
+                st.divider()
+                st.markdown("### The full picture")
 
                 for col, label, pm, pk in zip(
                         st.columns(3),
