@@ -1,153 +1,122 @@
 # SoccerPredict
 
-Soccer branch of **suraj-betting-apps**. Upload season match data, pick a fixture
-from the dropdowns, and get **1X2**, **BTTS Yes/No** and **Over/Under 2.5**
-probabilities from a Dixon–Coles team-strength model.
+`soccer` branch of **suraj-betting-apps**. A Dixon–Coles team-strength model,
+**tuned on your league**, **calibrated**, and **explicit that it sits behind the
+bookmaker**.
 
-| App | Branch | Entry point | Status |
-|---|---|---|---|
-| GreyhoundPredictor | `greyhound` | `app.py` | ✅ live |
-| HorsePredictor | `horse` | `app.py` | ✅ live |
-| HarnessPredict | `harness` | `app.py` | ✅ live |
-| **SoccerPredict** | `soccer` | `app.py` | ✅ live |
+Upload season CSVs, pick a fixture, get 1X2 / BTTS / Over-Under 2.5 — shown next
+to the market, with a flag on the disagreement.
 
-## Files
+## The finding this app is built around
 
-- `soccer_data.py` — CSV loading, cleaning and validation.
-- `soccer_model.py` — Dixon–Coles fit, score matrix, markets, bet signal, walk-forward backtest.
-- `app.py` — Streamlit UI.
-- `test_model.py` — 86-check regression suite.
-- `sample_data/` — Latvian Virsliga 2024, 2025, 2026 as bundled demo data.
+The intuitive idea is that where a model departs from the market it has found
+something. **Measured, the opposite is true.**
 
-## The bet signal
+Splitting 723 Dutch Eerste Divisie matches by how far the model and the market
+are apart:
 
-A banner above the 1X2 numbers that fires when the **1X2 view and the two most
-likely scorelines agree**. It adds no new information — it re-reads figures the
-model already produced — but it turns out to be a useful filter.
-
-| | condition |
-|---|---|
-| ✅ **green** | the side's win probability is **> 45%** *and* **both** of the top two scorelines are wins for it |
-| ⚠️ **yellow** | win probability **> 45%**, the **top** scoreline is a win for it, but the **second** is a draw |
-| *(nothing)* | anything else — including a **draw as the most likely score**, which is the distribution contradicting the 1X2 number rather than confirming it |
-
-The threshold is strict (`> 45%`, not `≥`) and adjustable in the sidebar. Both
-sides are tested, though two sides can only both clear 45% if the draw is under
-10%, which essentially never happens.
-
-### How it scored
-
-Replayed on **429 walk-forward predictions** from the three bundled Latvian
-Virsliga seasons — every match predicted by a model fitted only on earlier
-matches, so nothing saw its own result:
-
-| | bets | named team won | 95% CI | drawn |
+| disagreement | matches | model | market | model − market |
 |---|---|---|---|---|
-| ✅ **green** | 187 | **80.2%** | 73.9–85.3% | 10.7% |
-| ⚠️ **yellow** | 34 | **47.1%** | 31.5–63.3% | **29.4%** |
-| either | 221 | 75.1% | | 13.6% |
-| *every side the model rates > 45%* | 302 | *70.9%* | | *14.6%* |
+| smallest half | 362 | 1.0160 | 1.0072 | **+0.0088** |
+| 50th–75th pct | 181 | 1.0030 | 0.9939 | +0.0091 |
+| 75th–90th pct | 108 | 1.0537 | 1.0245 | +0.0292 |
+| top 10% | 73 | 1.0192 | 0.9526 | **+0.0666** |
 
-**The bottom row is the comparison that matters.** Green beats simply backing
-every side the model already likes, by 9.3 points, while skipping 27% of them
-(Fisher exact **p = 0.025**; the two groups overlap, so this understates rather
-than overstates the gap).
+Positive means the model is **worse**. Its disadvantage *grows* with the
+disagreement. And where the two name different favourites (13.7% of matches) the
+market is right **45.5%** against the model's **32.3%**.
 
-### Yellow is a caution, not a weaker green
+So a large gap is evidence that **the model** is wrong — usually because the
+market has absorbed team news the model cannot see. The flag says *look closer*,
+never *back this*. Tab 3 recomputes this from whatever data you load rather than
+asking you to take it on faith.
 
-This is the finding worth acting on. Yellow selections won **47.1%** — *below*
-the **54.0%** the model itself assigned them — and **29.4%** of those matches
-were drawn against **14.6%** for over-45% sides generally. **The draw sitting in
-second place roughly doubles the draw risk.** Green versus yellow separates at
-Fisher exact **p = 0.00014**, so the colour distinction is real and not a
-presentational flourish.
+## Where it stands
 
-The app states this on the yellow banner rather than letting the colour imply
-"nearly a green". At n = 34 yellow is still a small sample; treat it as a flag to
-look closer, not a bet.
+Walk-forward on three Dutch seasons — refitted before every matchday, so no
+match contributes to its own prediction:
 
-## What data it uses
+| | 1X2 log-loss |
+|---|---|
+| league base rates | 1.0557 |
+| **this model** | **≈1.021** |
+| the bookmaker | 1.0008 |
 
-From every **completed** match: the final score, **xG for each side**, **shots on
-target**, the date, and the two team names. Bookmaker odds are read *only* to
-benchmark the model in the backtest — they never feed the fit.
+The model captures roughly two-thirds of the available signal. The gap to the
+bookmaker is about **+0.02 with a 95% interval clear of zero** — real, not noise.
+It is well calibrated (mean absolute error ≈ **0.010** across probability bands):
+honest about its own uncertainty even while the market out-predicts it.
 
-Two data traps are handled explicitly, because both would quietly corrupt ratings:
+## Tuned per league, because the defaults were not yours
 
-- **`-1` sentinels.** Shot and foul columns use `-1` for "not recorded". Averaged
-  in as a real value it drags a team's attacking rating down. Treated as missing.
-- **Both-zero xG.** Three matches in the sample carry `0.00` xG for *both* sides —
-  one of them a 6–1. That is missing data, not a real goalless-chance game, so the
-  xG is dropped rather than believed.
+The shipped constants were tuned on a **ten-team** Latvian league. On a
+**twenty-team** Dutch one they rank **23rd of 27** settings tried. Every league
+now gets its own grid search on an inner time split, so the settings are chosen
+on matches that come *after* the ones they were fitted on.
 
-Unplayed fixtures, abandonments and suspensions are excluded via `status`.
+The gain is about **0.0025 log-loss** — real, and nowhere near enough to close
+the gap to the market. The top few settings sit inside the noise, so the app
+calls the winner *a reasonable setting*, not the optimum.
 
-## Method
+## Measured and rejected
 
-A **Dixon–Coles** team-strength model. Each team gets an attack and a defence
-parameter, and a fixture's expected goals are
+Everything below was tested on this data and did not work:
+
+| | result |
+|---|---|
+| a third season of the same league | **+0.0002** log-loss — nothing |
+| pooling other leagues | home advantage runs 0.164–0.415 across nine leagues and the low-score correction **flips sign**; pooling would hurt |
+| blending with the market | choosing the weight on a validation half put **zero** weight on the model |
+| the feed's own pre-match PPG/xG columns | made it **worse** — 1.0455 against 1.0348 for the model alone |
+| the goals markets | over/under 2.5 scored 0.6677 against a **0.6622 base rate** — worse than always predicting the league average |
+
+> ⚠️ The previous version of this README benchmarked over/under against a **coin
+> flip (0.6931)**. That is the wrong benchmark and it flattered the result. The
+> base rate is the honest comparison, and against it the model loses.
+
+## What would actually help
+
+Not more rows. In order:
+
+1. **Closing odds** rather than pre-match prices — far sharper, and the movement
+   between the two is itself signal: it is the market absorbing team news.
+2. **Lineups and injuries** — absent from this feed entirely, and probably the
+   largest missing variable in football modelling.
+3. For a promoted or relegated side, **data from the division it came from** —
+   otherwise the model just shrinks it to league average.
+
+## The model
+
+Each team gets an attack and a defence parameter:
 
 ```
 λ_home = exp(μ + attack_home + defence_away + γ)
 λ_away = exp(μ + attack_away + defence_home)
 ```
 
-with `γ` the home advantage **fitted from the data** (0.20 goals on the Latvian
-sample), not assumed. Because attack is always measured against the specific
-opponent's defence, a team gets no credit for feasting on the league's worst side.
+`γ` (home advantage) is **fitted from your data**, not assumed. Attack is always
+measured against the specific opponent's defence, so a team gets no credit for
+feasting on the league's worst side. The Dixon–Coles `τ` term repairs the 0–0 /
+1–0 / 0–1 / 1–1 cells that independent Poissons misprice — which is where
+football lives. The response blends goals, xG and shots on target: goals are what
+happened, the other two are less noisy measures of how a team played.
 
-Three refinements, each settled by backtest rather than taste:
+All markets come from one score matrix, so 1X2, BTTS and Over/Under are
+**mutually consistent by construction**.
 
-1. **The response is a blend** — 50% goals, 25% xG, 25% shots on target converted at
-   the league's own goals-per-SoT rate. Goals are what happened; xG and SoT are
-   less noisy measures of how a team actually played. The blend beat pure goals on
-   *all three* markets.
-2. **Light time decay** — `exp(-ξ × days ago)` with ξ = 0.0005. Tuning strongly
-   preferred a small ξ: in a ten-team league, aggressive recency-chasing throws
-   away more signal than it gains. (ξ = 0.005 was clearly worse: 0.9226 vs 0.8869.)
-3. **Low-score correction** — independent Poissons misprice 0–0, 1–0, 0–1 and 1–1,
-   which is exactly where football lives. The Dixon–Coles `τ` term is fitted on the
-   real scorelines.
+Two data traps are handled explicitly: `-1` sentinels in the shot columns are
+treated as missing rather than averaged in as real values, and matches recording
+`0.00` xG for *both* sides have their xG dropped — that is missing data, not a
+goalless-chance game.
 
-Newly promoted teams are pulled toward the league average by an L2 shrinkage term,
-so a two-game hot streak doesn't make a team a title favourite.
+## Files
 
-### From expected goals to markets
-
-The two λ values build a joint **score matrix**, and every market is a sum over its
-cells: 1X2 from the win/draw/loss regions, BTTS from cells with both scores ≥ 1,
-Over/Under 2.5 from cells totalling ≥ 3 or ≤ 2. Because all three come from one
-distribution they are **mutually consistent by construction**.
-
-## Measured accuracy
-
-`test_model.py` and the app's Backtest tab both run a **walk-forward** validation:
-the model is re-fitted before every matchday and predicts only that day's fixtures,
-so no match ever contributes to its own prediction.
-
-On the bundled Latvian data, **429 out-of-sample matches**:
-
-| | 1X2 log-loss | 1X2 RPS | Accuracy |
-|---|---|---|---|
-| **This model** | **0.8667** | **0.1709** | **61.5%** |
-| Bookmaker closing odds (de-vigged) | 0.8436 | 0.1638 | 62.5% |
-| League base rates | 1.0601 | 0.2368 | — |
-
-BTTS log-loss **0.6864**, Over/Under 2.5 log-loss **0.6764** (a coin flip is 0.6931).
-
-### Honest limitations
-
-- **The market is sharper than this model on 1X2.** Blending the two did not beat
-  the market alone in testing, so the odds input is there for *comparison*, not as
-  a free upgrade. Treat a large disagreement as a prompt to look closer.
-- **BTTS carries the least signal** — 0.6864 against a 0.6931 coin flip is a thin
-  edge. Over/Under 2.5 is the stronger of the two goals markets.
-- **A calibration layer was tried and rejected.** Platt scaling improved in-sample
-  but failed out-of-sample (Over 2.5 went from 0.6488 to 0.6780, and the fitted
-  slope swung from 0.44 to 1.05 between halves), so it is not shipped.
-- **Season is derived from the match date's year.** That is right for calendar-year
-  leagues like Latvia's; a league running August–May will show two "seasons" per
-  campaign. It affects display only, never the model, which works purely off dates.
+- `soccer_data.py` — CSV loading, cleaning, validation.
+- `soccer_model.py` — Dixon–Coles fit, score matrix, markets, walk-forward.
+- `assess.py` — per-league tuning, calibration, the disagreement flag.
+- `app.py` — Streamlit UI.
+- `test_model.py` — 104-check suite.
+- `sample_data/` — Dutch Eerste Divisie 2024-25, 2025-26, 2026-27.
 
 ## Run locally
 
@@ -162,18 +131,15 @@ streamlit run app.py
 python test_model.py
 ```
 
-Expect `PASS 86  FAIL 0`. The suite checks data integrity against hand-counted
-values, mathematical invariants that must hold for any input (probabilities summing
-to one, home advantage having the right sign, a stronger defence reducing expected
-goals), golden values pinning the current fit, and that the backtest still beats
-league base rates and a coin flip.
-
-## Deploy (Streamlit Community Cloud)
-
-New app → repo `sbachagian1101/suraj-betting-apps` → branch `soccer` → main file
-`app.py` → Advanced settings → Python **3.13**. Pushing to the branch auto-redeploys.
+Expect `PASS 104  FAIL 0`. The suite is deliberately **data-agnostic** — an
+earlier version hardcoded Latvian team names and golden log-loss values, so
+swapping the bundled league broke it for reasons unrelated to the code. It now
+asserts properties that hold for any league, including the claim the whole app
+rests on: that the model's disadvantage against the market grows with
+disagreement.
 
 ---
 
-*Predictions are probabilistic decision support, not a guaranteed outcome. Gamble
-responsibly — Gambling Help 1800 858 858, [gamblinghelponline.org.au](https://www.gamblinghelponline.org.au).*
+*Prediction is probabilistic decision support, not a guaranteed outcome. Gamble
+responsibly — Gambling Help 1800 858 858,
+[gamblinghelponline.org.au](https://www.gamblinghelponline.org.au).*
