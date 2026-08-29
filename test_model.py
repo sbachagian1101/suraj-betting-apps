@@ -238,6 +238,57 @@ def main():
     else:
         print("  (race file not found — skipped the end-to-end checks)")
 
+    # ---- attrs must survive the trip to the browser -----------------------
+    # Streamlit ships a DataFrame as Arrow, and pandas writes `DataFrame.attrs`
+    # into the Arrow schema metadata AS JSON. Python's json.loads accepts NaN;
+    # JavaScript's JSON.parse does not. A NaN here therefore fails nowhere in
+    # Python and blows up client-side as an unreadable SyntaxError mid-page.
+    # This is the regression test for that.
+    import re
+
+    import pyarrow as pa
+
+    def js_safe(frame):
+        md = pa.Table.from_pandas(frame).schema.metadata
+        if not md or b"pandas" not in md:
+            return True, ""
+        raw = md[b"pandas"].decode()
+        bad = re.search(r":\s*(NaN|Infinity|-Infinity)\b", raw)
+        return (bad is None), (bad.group(0) if bad else "")
+
+    if os.path.exists(RACE):
+        race_full = pd.read_excel(RACE)
+        # a race where ONE runner has no price - the case that broke the app
+        partial = race_full.copy()
+        partial.loc[partial.index[0], D.ODDS] = np.nan
+        for label, frame in (("fully priced", race_full), ("partly priced", partial)):
+            tt = P.score_race(frame, B, sims=3000)
+            c.true(f"{label}: no NaN anywhere in attrs",
+                   not any(isinstance(v, float) and np.isnan(v)
+                           for v in tt.attrs.values()))
+            shown = tt.drop(columns=[x for x in tt.columns if x.startswith("_")])
+            ok_js, found = js_safe(shown)
+            c.true(f"{label}: arrow metadata is valid JavaScript JSON{'' if ok_js else ' — found '+found}",
+                   ok_js)
+        pt = P.score_race(partial, B, sims=3000)
+        c.true("a partly priced race falls back to fundamentals",
+               pt.attrs["has_book"] is False)
+        c.true("and reports overround as None, not NaN",
+               pt.attrs["overround"] is None)
+        c.check("and counts the priced runners",
+                pt.attrs["priced_runners"], len(race_full) - 1)
+        c.true("and is flagged as outside the validated configuration",
+               pt.attrs["validated_config"] is False)
+        ft = P.score_race(race_full, B, sims=3000)
+        c.true("a fully priced race reports a real overround",
+               isinstance(ft.attrs["overround"], float)
+               and ft.attrs["overround"] > 1.0)
+        c.true("and is the validated configuration",
+               ft.attrs["validated_config"] is True)
+        c.true("turning the market off leaves the validated flag false",
+               P.score_race(race_full, B, use_market=False,
+                            sims=3000).attrs["validated_config"] is False)
+
     print(f"PASS {c.passes}  FAIL {len(c.fails)}")
     if c.fails:
         print("\n".join(c.fails))

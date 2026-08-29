@@ -70,9 +70,21 @@ def score_race(race_df: pd.DataFrame, bundle: dict, *,
     })
     out = out.sort_values("Win %", ascending=False).reset_index(drop=True)
     out.insert(0, "Rank", np.arange(1, n + 1))
+
+    # `DataFrame.attrs` is written into the Arrow schema metadata as JSON when
+    # Streamlit ships the frame to the browser, and **JavaScript's JSON.parse
+    # rejects NaN** even though Python's json.loads accepts it. A NaN here does
+    # not fail in Python at all - it fails client-side, as an unreadable
+    # SyntaxError in the middle of the rendered page. So attrs carries None,
+    # never NaN.
     out.attrs["mode"] = mode
     out.attrs["places_paid"] = int(places)
-    out.attrs["overround"] = float((1 / odds).sum()) if has_book else float("nan")
+    out.attrs["overround"] = float((1 / odds).sum()) if has_book else None
+    out.attrs["has_book"] = bool(has_book)
+    out.attrs["priced_runners"] = int(np.isfinite(odds).sum())
+    out.attrs["validated_config"] = bool(has_book and use_market)
+    assert not any(isinstance(v, float) and np.isnan(v)
+                   for v in out.attrs.values()), "NaN in attrs would break the UI"
     return out
 
 
@@ -80,8 +92,12 @@ if __name__ == "__main__":
     b = load_bundle()
     race = pd.read_excel("D:/01_PREDICTION MODELS/20260818-lingfield-r06.xlsx")
     t = score_race(race, b)
+    ov = t.attrs["overround"]
     print(f"mode: {t.attrs['mode']} | places paid {t.attrs['places_paid']} | "
-          f"book {t.attrs['overround']:.3f}\n")
+          f"book {ov:.3f}" if ov else
+          f"mode: {t.attrs['mode']} | places paid {t.attrs['places_paid']} | "
+          f"no complete book")
+    print()
     show = t.drop(columns=[c for c in t.columns if c.startswith("_")])
     print(show.to_string(index=False, float_format=lambda v: f"{v:.2f}"))
     print("\nthe three components, win % each:")

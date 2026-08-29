@@ -106,10 +106,20 @@ with pred_tab:
             c2.metric("Places paid", t.attrs["places_paid"])
             c3.metric("Mode", "Blend" if "market" in t.attrs["mode"] else "Fundamentals")
             ov = t.attrs["overround"]
-            c4.metric("Book", f"{ov:.3f}" if np.isfinite(ov) else "—",
-                      f"{100*(ov-1):.1f}% margin" if np.isfinite(ov) else None,
+            c4.metric("Book", f"{ov:.3f}" if ov else "—",
+                      f"{100*(ov-1):.1f}% margin" if ov else "incomplete",
                       delta_color="inverse")
-            if np.isfinite(ov) and ov > 1.25:
+            if not t.attrs["has_book"]:
+                st.warning(
+                    f"Only {t.attrs['priced_runners']} of {len(t)} runners are "
+                    "priced, so the market could not be de-vigged and the model "
+                    "fell back to **fundamentals only**. That is the weaker "
+                    "setting — on held-out races it scored 1.9361 log-loss "
+                    "against the blend's 1.8111 — and it is **not** the "
+                    "configuration the value results were measured in. Treat any "
+                    "edge below with more caution than usual.",
+                    icon=":material/warning:")
+            if ov and ov > 1.25:
                 st.warning(
                     f"This book carries a **{100*(ov-1):.0f}% margin**. The "
                     "validated edge was measured on books averaging 12.9% — at "
@@ -137,13 +147,23 @@ with pred_tab:
                     f'edge {r["Edge"]:+.2f})' for _, r in val.iterrows())
                 st.success(f"**Value at edge > {min_edge:.2f}:** {names}",
                            icon=":material/trending_up:")
-                st.caption(
-                    f"The validated strategy backed every runner with a positive "
-                    f"edge: {V['value_bets']:,} bets, {100*V['value_strike']:.1f}% "
-                    f"strike, ROI {100*V['value_roi']:+.1f}% "
-                    f"(95% CI {100*V['value_roi_ci'][0]:+.1f}% to "
-                    f"{100*V['value_roi_ci'][1]:+.1f}%). These are longshots — "
-                    f"expect one winner in nine and long losing runs.")
+                if t.attrs["validated_config"]:
+                    st.caption(
+                        f"The validated strategy backed every runner with a "
+                        f"positive edge: {V['value_bets']:,} bets, "
+                        f"{100*V['value_strike']:.1f}% strike, ROI "
+                        f"{100*V['value_roi']:+.1f}% (95% CI "
+                        f"{100*V['value_roi_ci'][0]:+.1f}% to "
+                        f"{100*V['value_roi_ci'][1]:+.1f}%). These are longshots "
+                        f"— expect one winner in nine and long losing runs.")
+                else:
+                    st.caption(
+                        "⚠️ These edges come from the **fundamentals-only** "
+                        "model, because the market term is unavailable or "
+                        "switched off. The +22.6% ROI was measured with the "
+                        "market in the blend and does **not** transfer to this "
+                        "setting. Without a market anchor the model is at its "
+                        "weakest on exactly these long prices.")
             else:
                 st.info(f"No runner clears an edge of {min_edge:.2f}. "
                         "That is the common case and a real answer.",
