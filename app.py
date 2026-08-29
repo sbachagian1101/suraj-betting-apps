@@ -34,6 +34,27 @@ div[data-testid="stMetric"] {border:1px solid rgba(128,128,128,.22);
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
+# Streamlit Cloud pulls new code but keeps already-imported modules in
+# sys.modules, so a commit that ADDS a function to a helper module can leave the
+# new app.py running against the old module. That fails deep inside whichever
+# tab uses the new symbol, as an opaque AttributeError, long after the page has
+# rendered fine. Checking up front turns it into one actionable sentence.
+_REQUIRED_ASSESS = ("tune", "default_params", "with_market", "overall_gap",
+                    "disagreement_table", "pick_conflict", "calibration_table",
+                    "calibration_error", "flag", "recommend", "confidence_band",
+                    "FLAG_TEXT", "CONFIDENCE_TEXT", "BUCKET_ROI",
+                    "FAVOURITE_ROI")
+_missing = [n for n in _REQUIRED_ASSESS if not hasattr(A, n)]
+if _missing:
+    names = "`, `".join(_missing)
+    st.error(
+        f"**This deployment is running stale code.** `assess.py` is missing "
+        f"`{names}`, which the current `app.py` needs. Streamlit Cloud pulled "
+        "the new files but kept the old module in memory. Fix it with "
+        "**Manage app → ⋮ → Reboot app**.",
+        icon=":material/error:")
+    st.stop()
+
 
 @st.cache_data(show_spinner="Reading match data…")
 def load_uploads(payloads):
