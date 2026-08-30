@@ -41,6 +41,52 @@ card rather than backing its own top pick.
 | **ROI** | **+22.6%**, 95% CI +5.8% to +40.5% |
 | folds positive | **5/5** |
 
+## Jockey-only mode
+
+A second, deliberately blinkered model that sees **33 columns about the rider
+and nothing about the horse**: earnings, starts, wins, places, strike rate and
+ROI over the last 100 rides, 12 months, this season and last season, plus the
+apprentice claim.
+
+| | top-1 | top-3 | log-loss |
+|---|---|---|---|
+| a dart throw | 11.3% | — | — |
+| **jockey only** | **22.4%** | 54.6% | 2.0888 |
+| the market | 38.1% | 66.5% | 1.8275 |
+| everything + market | 35.5% | 65.8% | 1.8111 |
+
+The jockey columns **roughly double a random pick**, so they carry real signal.
+They are also well behind the market and the full model — and when the jockey
+model was blended with the market, the fitted weight on the market was
+**100%**: the rider's record adds nothing on top of the price.
+
+The strongest columns by a distance are the **ROI figures** — this season, 12
+months, last season, last 100 — ahead of strike rates and average earnings. ROI
+captures whether a jockey beats the prices they ride at, which is closer to
+skill than a raw win rate.
+
+Selectable in the sidebar. The app carries a banner in this mode stating all of
+the above, because a top pick shown without that context reads far stronger
+than it is.
+
+## A CSV trap worth knowing about
+
+The Racing & Sports **CSV** export ends every data row with a trailing comma, so
+rows carry **129 fields against a 128-name header**. Pandas resolves that by
+promoting the first column to the index, which shifts every column one to the
+left:
+
+| column | naive `read_csv` | correct |
+|---|---|---|
+| `Horse Name` | `[5, 4, 4]` (ages) | `['Manoora', 'Curie', 'Dunquin']` |
+| `Best Fixed Odds` | `[60.0, 59.5, 59.0]` (weights) | `[2.9, 3.4, 8.0]` |
+
+Nothing raises. The frame looks fine and every prediction from it is nonsense.
+`data.read_race_file()` reads CSVs with `index_col=False` and then checks that
+horse names are not numbers, refusing the file if they are. The `.xlsx` export
+is unaffected. The regression test builds both a clean and a trailing-comma file
+and asserts the naive read really does corrupt while the safe one recovers.
+
 ## The three things that would kill it
 
 **Price slippage.** Same bets, settled worse:
@@ -115,9 +161,9 @@ so the fundamental rating can be compared against a price it has never seen.
 - `data.py` — loading, race ids, Shin de-vig, within-race features.
 - `models.py` — conditional logit, boosted models, blending, Plackett–Luce, metrics.
 - `train.py` — fits and saves `model_bundle.joblib`.
-- `predict.py` — scores one race from the bundle.
+- `predict.py` — scores one race from the bundle (`feature_set='all'` or `'jockey'`).
 - `app.py` — Streamlit UI.
-- `test_model.py` — 130-check suite.
+- `test_model.py` — 172-check suite.
 - `model_bundle.joblib` — the trained model (2.2 MB).
 
 ## Retraining
@@ -138,7 +184,7 @@ also learned from.
 python test_model.py
 ```
 
-Expect `PASS 130  FAIL 0`. It pins mathematical properties rather than numbers:
+Expect `PASS 172  FAIL 0`. It pins mathematical properties rather than numbers:
 the de-vig removes the overround and sums to one, probabilities sum to one inside
 each race, the conditional logit recovers weights from data generated with known
 ones, place probabilities sum to the number of places paid, and a race with no

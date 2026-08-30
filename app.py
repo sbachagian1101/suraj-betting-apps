@@ -36,6 +36,7 @@ def bundle():
 
 B = bundle()
 V = B["validation"]
+J = B["jockey_validation"]      # used by the sidebar and the Method tab
 
 st.title("HorsePredictorPro")
 st.caption(f"Conditional logit + gradient boosting + LambdaRank, blended with "
@@ -44,6 +45,15 @@ st.caption(f"Conditional logit + gradient boosting + LambdaRank, blended with "
 
 with st.sidebar:
     st.header("Settings", divider="gray")
+    feature_set = st.radio(
+        "What the model may look at",
+        ["all", "jockey"],
+        format_func=lambda k: {"all": "Everything (217 features)",
+                               "jockey": "Jockey only (33 columns)"}[k],
+        help="Jockey-only sees the rider's record and nothing about the horse: "
+             "earnings, starts, wins, places, strike rate and ROI over the last "
+             "100 rides, 12 months, this season and last, plus the apprentice "
+             "claim. It is a much weaker model — see the metrics below.")
     use_market = st.toggle(
         "Use the market price", value=True,
         help="On: blend the model with the de-vigged book — the most accurate "
@@ -55,12 +65,24 @@ with st.sidebar:
              "used edge > 0.")
     sims = st.select_slider("Place simulations", [5000, 20000, 50000], 20000)
     st.divider()
-    st.metric("Log-loss vs market", f"{-V['logloss_edge']:+.4f}",
-              help="Negative is better. Beat the market in "
-                   f"{V['folds_positive_logloss']} walk-forward folds.")
-    st.metric("Value-bet ROI", f"{100*V['value_roi']:+.1f}%",
-              f"{V['folds_positive_roi']} folds positive")
-    st.caption("Walk-forward, out of sample. Full detail on the Validation tab.")
+    if feature_set == "jockey":
+        st.metric("Top pick wins", f"{100*J['top1']:.1f}%",
+                  f"{100*(J['top1']-J['market_top1']):+.1f} pts vs market",
+                  delta_color="inverse")
+        st.metric("A dart throw", f"{100*J['dart_throw_top1']:.1f}%",
+                  help="The jockey columns roughly double a random pick — real "
+                       "signal, but far behind the market's "
+                       f"{100*J['market_top1']:.1f}%.")
+        st.caption("Jockey-only. Weaker than the full model on every measure; "
+                   "the numbers are on the Validation tab.")
+    else:
+        st.metric("Log-loss vs market", f"{-V['logloss_edge']:+.4f}",
+                  help="Negative is better. Beat the market in "
+                       f"{V['folds_positive_logloss']} walk-forward folds.")
+        st.metric("Value-bet ROI", f"{100*V['value_roi']:+.1f}%",
+                  f"{V['folds_positive_roi']} folds positive")
+        st.caption("Walk-forward, out of sample. Full detail on the "
+                   "Validation tab.")
 
 pred_tab, detail_tab, valid_tab, method_tab = st.tabs(
     ["1 · Predict", "2 · Model detail", "3 · Validation", "Method"])
@@ -69,12 +91,14 @@ st.session_state.setdefault("race", None)
 
 with pred_tab:
     st.subheader("Upload a race sheet")
-    st.caption("A Racing & Sports single-race export (`<date>-<track>-rNN.xlsx`) "
-               "— the 128-column format with `Best Fixed Odds`.")
-    up = st.file_uploader("Race file", type=["xlsx"], label_visibility="collapsed")
+    st.caption("A Racing & Sports single-race export "
+               "(`<date>-<track>-rNN.xlsx` or `.csv`) — the 128-column format "
+               "with `Best Fixed Odds`.")
+    up = st.file_uploader("Race file", type=["xlsx", "csv"],
+                          label_visibility="collapsed")
     if up is not None:
         try:
-            st.session_state["race"] = pd.read_excel(up)
+            st.session_state["race"] = D.read_race_file(up, up.name)
         except Exception as exc:                             # noqa: BLE001
             st.session_state["race"] = None
             st.error(f"Could not read that file — {type(exc).__name__}: {exc}")
@@ -84,7 +108,8 @@ with pred_tab:
         st.info("Upload a race to begin.", icon=":material/upload_file:")
     else:
         try:
-            t = P.score_race(race, B, use_market=use_market, sims=int(sims))
+            t = P.score_race(race, B, use_market=use_market, sims=int(sims),
+                             feature_set=feature_set)
         except Exception as exc:                             # noqa: BLE001
             st.error(f"Could not score that race — {type(exc).__name__}: {exc}")
             t = None
@@ -100,6 +125,21 @@ with pred_tab:
                     top["Win %"], top["Place %"], top["Fair $"],
                     f' · market ${top["Odds"]:.2f}' if np.isfinite(top["Odds"]) else ""),
                 unsafe_allow_html=True)
+
+            if feature_set == "jockey":
+                st.warning(
+                    f"**Jockey-only mode.** The model is looking at "
+                    f"{J['n_columns']} columns about the rider and nothing "
+                    f"about the horse. On {J['test_races']} held-out races its "
+                    f"top pick won **{100*J['top1']:.1f}%** — against "
+                    f"{100*J['dart_throw_top1']:.1f}% for a dart throw, so the "
+                    f"jockey data is genuinely informative, but against "
+                    f"**{100*J['market_top1']:.1f}%** for the market and "
+                    f"**{100*J['full_top1']:.1f}%** for the full model. "
+                    f"Blending it with the market put "
+                    f"{100*J['market_weight_when_blended']:.0f}% of the weight "
+                    "on the market: it adds nothing on top of the price.",
+                    icon=":material/visibility_off:")
 
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Runners", len(t))
@@ -174,7 +214,8 @@ with detail_tab:
     if race is None:
         st.info("Upload a race in **1 · Predict** first.", icon=":material/info:")
     else:
-        t = P.score_race(race, B, use_market=use_market, sims=5000)
+        t = P.score_race(race, B, use_market=use_market, sims=5000,
+                         feature_set=feature_set)
         st.subheader("What each model thinks")
         st.caption("The three fundamental models disagree by design — that is "
                    "why blending them helps. Where they agree, the blend is "
@@ -253,6 +294,30 @@ three of the five folds negative. A small number of results carry the return.
 **Variance.** One winner in nine, with a longest losing run of 48 bets and a
 worst drawdown of 190 units at flat stakes in the validation. That is the
 normal shape of this strategy, not a malfunction.
+
+### Jockey-only mode
+
+A second, deliberately blinkered model that sees **{J["n_columns"]} columns** about the
+rider and nothing about the horse: earnings, starts, wins, places, strike rate
+and ROI over the last 100 rides, 12 months, this season and last season, plus
+the apprentice claim.
+
+| | top-1 | top-3 | log-loss |
+|---|---|---|---|
+| a dart throw | {100*J["dart_throw_top1"]:.1f}% | — | — |
+| **jockey only** | **{100*J["top1"]:.1f}%** | {100*J["top3"]:.1f}% | {J["logloss"]:.4f} |
+| the market | {100*J["market_top1"]:.1f}% | {100*J["market_top3"]:.1f}% | {J["market_logloss"]:.4f} |
+| everything + market | {100*J["full_top1"]:.1f}% | — | {J["full_logloss"]:.4f} |
+
+The jockey columns roughly **double a random pick**, so they carry real signal.
+They are also comfortably behind both the market and the full model, and when
+the jockey model was blended with the market the fitted weight on the market was
+**{100*J["market_weight_when_blended"]:.0f}%** — the rider's record adds nothing on top of the price.
+
+The strongest columns, by a distance, are the **ROI figures** — this season,
+12 months, last season and last 100 — ahead of strike rates and average
+earnings. ROI captures whether a jockey outperforms the prices they ride at,
+which is closer to skill than a raw win rate is.
 
 ### What was NOT done
 

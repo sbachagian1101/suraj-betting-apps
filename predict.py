@@ -25,32 +25,51 @@ def load_bundle(path: str = BUNDLE):
 
 
 def score_race(race_df: pd.DataFrame, bundle: dict, *,
-               use_market: bool = True, sims: int = 20000) -> pd.DataFrame:
+               use_market: bool = True, sims: int = 20000,
+               feature_set: str = "all") -> pd.DataFrame:
+    """Score one race.
+
+    `feature_set` is "all" or "jockey". The jockey model sees only the rider's
+    own record - earnings, starts, wins, places, strike rate and ROI over four
+    horizons, plus the apprentice claim - and nothing about the horse. It is a
+    genuinely weaker model, kept because it answers a different question.
+    """
+    if feature_set not in ("all", "jockey"):
+        raise ValueError("feature_set must be 'all' or 'jockey'")
+    jockey = feature_set == "jockey"
+
     df = D.prepare(race_df, require_result=False)
     n = len(df)
     if n < 2:
         raise ValueError("need at least two runners")
 
-    X, _ = D.build_features(df, cols=bundle["base_columns"], with_market=False)
-    F = X.reindex(columns=bundle["feature_names"], fill_value=0.0).to_numpy(float)
+    cols = bundle["jockey_columns"] if jockey else bundle["base_columns"]
+    names = bundle["jockey_feature_names"] if jockey else bundle["feature_names"]
+    X, _ = D.build_features(df, cols=cols, with_market=False)
+    F = X.reindex(columns=names, fill_value=0.0).to_numpy(float)
     sl = M.race_slices(df["race_id"].to_numpy())
 
-    p_logit = M.softmax_by_race(F @ bundle["logit_beta"], sl)
-    p_gbm = M.normalise_by_race(bundle["gbm"].predict_proba(F)[:, 1], sl)
-    p_rank = M.softmax_by_race(bundle["ranker"].predict(F), sl)
+    beta = bundle["jockey_logit_beta"] if jockey else bundle["logit_beta"]
+    gbm = bundle["jockey_gbm"] if jockey else bundle["gbm"]
+    rank = bundle["jockey_ranker"] if jockey else bundle["ranker"]
+    p_logit = M.softmax_by_race(F @ beta, sl)
+    p_gbm = M.normalise_by_race(gbm.predict_proba(F)[:, 1], sl)
+    p_rank = M.softmax_by_race(rank.predict(F), sl)
 
     odds = pd.to_numeric(df.get(D.ODDS), errors="coerce").to_numpy(float)
     has_book = np.isfinite(odds).all() and (odds > 1).all()
 
+    w_market = bundle["jockey_weights_market"] if jockey else bundle["weights"]
+    w_alone = bundle["jockey_weights"] if jockey else bundle["weights_fundamentals"]
+    label = "jockey" if jockey else "fundamentals"
     if use_market and has_book:
         p_mkt = D.shin_devig(odds)
-        p = M.blend_log([p_logit, p_gbm, p_rank, p_mkt], bundle["weights"], sl)
-        mode = "blend + market"
+        p = M.blend_log([p_logit, p_gbm, p_rank, p_mkt], w_market, sl)
+        mode = f"{label} + market"
     else:
         p_mkt = np.full(n, np.nan)
-        p = M.blend_log([p_logit, p_gbm, p_rank],
-                        bundle["weights_fundamentals"], sl)
-        mode = "fundamentals only" + ("" if has_book else " (no complete book)")
+        p = M.blend_log([p_logit, p_gbm, p_rank], w_alone, sl)
+        mode = f"{label} only" + ("" if has_book else " (no complete book)")
 
     places = np.where(n >= 8, 3, np.where(n >= 5, 2, 1))
     p_place = M.place_probabilities(p, sl, np.full(n, places), sims=sims)
@@ -82,7 +101,10 @@ def score_race(race_df: pd.DataFrame, bundle: dict, *,
     out.attrs["overround"] = float((1 / odds).sum()) if has_book else None
     out.attrs["has_book"] = bool(has_book)
     out.attrs["priced_runners"] = int(np.isfinite(odds).sum())
-    out.attrs["validated_config"] = bool(has_book and use_market)
+    out.attrs["validated_config"] = bool(has_book and use_market and not jockey)
+    out.attrs["feature_set"] = feature_set
+    out.attrs["market_weight"] = (float(w_market[3])
+                                  if (use_market and has_book) else None)
     assert not any(isinstance(v, float) and np.isnan(v)
                    for v in out.attrs.values()), "NaN in attrs would break the UI"
     return out
@@ -90,7 +112,7 @@ def score_race(race_df: pd.DataFrame, bundle: dict, *,
 
 if __name__ == "__main__":
     b = load_bundle()
-    race = pd.read_excel("D:/01_PREDICTION MODELS/20260818-lingfield-r06.xlsx")
+    race = D.read_race_file("D:/01_PREDICTION MODELS/20260818-lingfield-r06.xlsx")
     t = score_race(race, b)
     ov = t.attrs["overround"]
     print(f"mode: {t.attrs['mode']} | places paid {t.attrs['places_paid']} | "

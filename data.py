@@ -81,6 +81,38 @@ def shin_devig(odds: np.ndarray, tol: float = 1e-10, iters: int = 200) -> np.nda
 # --------------------------------------------------------------------------
 # loading
 # --------------------------------------------------------------------------
+def read_race_file(src, filename: str | None = None) -> pd.DataFrame:
+    """Read one race sheet, CSV or Excel, without letting the columns shift.
+
+    The CSV export ends every data row with a trailing comma, so the rows carry
+    **129 fields against a 128-name header**. Pandas resolves that by silently
+    promoting the first column to the index, which shifts every column one to
+    the left: `Horse Name` comes back holding ages and `Best Fixed Odds` holding
+    carried weights. Nothing raises - the frame looks fine and every prediction
+    made from it is nonsense.
+
+    `index_col=False` refuses that inference. It is harmless when the counts
+    already match, so it is applied unconditionally, and the result is then
+    checked: horse names must not be numbers.
+    """
+    name = (filename or getattr(src, "name", "") or str(src)).lower()
+    if name.endswith((".xlsx", ".xlsm", ".xls")):
+        df = pd.read_excel(src)
+    else:
+        df = pd.read_csv(src, index_col=False)
+
+    horse = df.get("Horse Name")
+    if horse is not None and len(horse):
+        numeric = pd.to_numeric(horse, errors="coerce").notna().mean()
+        if numeric > 0.5:
+            raise ValueError(
+                "The columns in this file are misaligned - 'Horse Name' holds "
+                "numbers. That usually means the header and the data rows have "
+                "different field counts. Re-export the race sheet."
+            )
+    return df
+
+
 def load(src: str = SRC, require_result: bool = True) -> pd.DataFrame:
     df = pd.read_excel(src)
     return prepare(df, require_result=require_result)
@@ -137,6 +169,23 @@ def base_columns(df: pd.DataFrame, min_fill: float = 0.90) -> list[str]:
     cols = [c for c in num if c not in EXCLUDE and c != "field_size"]
     fill = df[cols].notna().mean()
     return [c for c in cols if fill[c] >= min_fill]
+
+
+def jockey_columns(df: pd.DataFrame, min_fill: float = 0.90) -> list[str]:
+    """Only what is known about the rider.
+
+    Thirty-two statistics - earnings, starts, wins, places, strike rate and ROI
+    over the last 100 rides, twelve months, this season and last season - plus
+    the apprentice claim, which is a property of the jockey and shows up as a
+    real weight advantage.
+
+    Nothing about the horse, trainer, distance, going or draw.
+    """
+    cols = [c for c in base_columns(df, min_fill) if c.lower().startswith("jockey")]
+    claim = "Jockey Weight Claim"
+    if claim in df.columns and claim not in cols:
+        cols.append(claim)
+    return cols
 
 
 def build_features(df: pd.DataFrame, cols: list[str] | None = None,

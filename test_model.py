@@ -289,6 +289,109 @@ def main():
                P.score_race(race_full, B, use_market=False,
                             sims=3000).attrs["validated_config"] is False)
 
+    # ---- the CSV column-shift trap ----------------------------------------
+    # The CSV export ends every data row with a trailing comma, so rows carry
+    # 129 fields against a 128-name header. Pandas resolves that by promoting
+    # the first column to the index, shifting every column one left: 'Horse
+    # Name' ends up holding ages and 'Best Fixed Odds' holding carried weights.
+    # Nothing raises. This is the regression test for that silent corruption.
+    import csv as _csv
+    import tempfile
+
+    hdr = ["Num", "Horse Name", "Age", "Best Fixed Odds"]
+    rows = [[1, "Alpha", 5, 2.5], [2, "Bravo", 4, 3.5], [3, "Charlie", 6, 9.0]]
+    with tempfile.TemporaryDirectory() as tmp:
+        good = os.path.join(tmp, "good.csv")
+        with open(good, "w", newline="", encoding="utf-8") as fh:
+            w = _csv.writer(fh)
+            w.writerow(hdr)
+            w.writerows(rows)
+        trap = os.path.join(tmp, "trap.csv")
+        with open(trap, "w", encoding="utf-8") as fh:
+            fh.write(",".join(hdr) + "\n")
+            for r in rows:                       # the trailing comma
+                fh.write(",".join(str(x) for x in r) + ",\n")
+
+        g = D.read_race_file(good)
+        c.check("a clean csv reads its names", list(g["Horse Name"]),
+                ["Alpha", "Bravo", "Charlie"])
+        c.check("and its odds", list(g["Best Fixed Odds"]), [2.5, 3.5, 9.0])
+
+        naive = pd.read_csv(trap)
+        c.true("the trap really does corrupt a naive read",
+               list(naive["Horse Name"]) != ["Alpha", "Bravo", "Charlie"])
+
+        t_ = D.read_race_file(trap)
+        c.check("the safe reader recovers the names", list(t_["Horse Name"]),
+                ["Alpha", "Bravo", "Charlie"])
+        c.check("and the odds", list(t_["Best Fixed Odds"]), [2.5, 3.5, 9.0])
+
+        # a genuinely misaligned file must be refused, not silently scored
+        broken = os.path.join(tmp, "broken.csv")
+        with open(broken, "w", encoding="utf-8") as fh:
+            fh.write("Horse Name,Age\n")
+            fh.write("5,Alpha\n6,Bravo\n7,Charlie\n")
+        try:
+            D.read_race_file(broken)
+            c.true("numeric horse names are rejected", False)
+        except ValueError as exc:
+            c.true("numeric horse names are rejected", "misaligned" in str(exc))
+
+    c.true("an xlsx path still routes to the excel reader",
+           D.read_race_file(RACE)["Horse Name"].notna().all()
+           if os.path.exists(RACE) else True)
+
+    # ---- jockey-only mode -------------------------------------------------
+    jc = D.jockey_columns(D.load()) if False else B["jockey_columns"]
+    c.true("the jockey column set is a real subset",
+           0 < len(jc) < len(B["base_columns"]))
+    c.true("every jockey column is about the jockey",
+           all(x.lower().startswith("jockey") for x in jc))
+    c.true("nothing about the horse leaked in",
+           not any(k in x.lower() for x in jc
+                   for k in ("career", "track", "distance", "trainer",
+                             "barrier", "weight carried", "handicap")))
+    c.true("the apprentice claim is included",
+           any("claim" in x.lower() for x in jc))
+    c.check("jockey logit has one weight per jockey feature",
+            len(B["jockey_logit_beta"]), len(B["jockey_feature_names"]))
+    c.close("jockey blend weights sum to one",
+            float(np.sum(B["jockey_weights"])), 1.0, 1e-9)
+    c.close("jockey market weights sum to one",
+            float(np.sum(B["jockey_weights_market"])), 1.0, 1e-9)
+
+    Jv = B["jockey_validation"]
+    c.true("jockey beats a dart throw", Jv["top1"] > Jv["dart_throw_top1"])
+    c.true("by roughly double", Jv["top1"] > 1.7 * Jv["dart_throw_top1"])
+    c.true("but loses to the market", Jv["top1"] < Jv["market_top1"])
+    c.true("and to the full model", Jv["top1"] < Jv["full_top1"])
+    c.true("its log-loss is worse than the market's",
+           Jv["logloss"] > Jv["market_logloss"])
+    c.true("blending put most weight on the market",
+           Jv["market_weight_when_blended"] >= 0.85)
+    c.true("top-3 beats top-1", Jv["top3"] > Jv["top1"])
+    c.true("the drivers are named", len(Jv["top_drivers"]) >= 4)
+    c.true("ROI leads the drivers", "ROI" in Jv["top_drivers"][0])
+
+    if os.path.exists(RACE):
+        race_x = D.read_race_file(RACE)
+        tj = P.score_race(race_x, B, feature_set="jockey", sims=3000)
+        ta = P.score_race(race_x, B, feature_set="all", sims=3000)
+        c.check("jockey mode scores every runner", len(tj), len(race_x))
+        c.close("jockey probabilities sum to 100", tj["Win %"].sum(), 100.0, 1e-6)
+        c.true("jockey mode is ranked", list(tj["Rank"]) == sorted(tj["Rank"]))
+        c.check("the mode is reported", tj.attrs["feature_set"], "jockey")
+        c.check("and for the full model", ta.attrs["feature_set"], "all")
+        c.true("jockey mode is never the validated configuration",
+               tj.attrs["validated_config"] is False)
+        c.true("the two modes actually differ",
+               not np.allclose(sorted(tj["Win %"]), sorted(ta["Win %"]), atol=1e-6))
+        try:
+            P.score_race(race_x, B, feature_set="trainer")
+            c.true("an unknown feature set is rejected", False)
+        except ValueError:
+            c.true("an unknown feature set is rejected", True)
+
     print(f"PASS {c.passes}  FAIL {len(c.fails)}")
     if c.fails:
         print("\n".join(c.fails))
