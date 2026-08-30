@@ -1,0 +1,11 @@
+# scikit-learn is not optional: model_bundle.joblib holds a fitted Ridge, so
+# joblib.load raises ModuleNotFoundError without it. pymupdf does the PDF text
+# extraction; pyarrow backs the dataframes Streamlit serialises.
+streamlit>=1.57,<2
+pandas>=2.2,<3
+numpy>=2.0,<3
+scipy>=1.13,<2
+scikit-learn>=1.5,<2
+joblib>=1.4,<2
+pymupdf>=1.24,<2
+pyarrow>=16
