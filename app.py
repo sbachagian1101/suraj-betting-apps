@@ -338,8 +338,8 @@ with data_tab:
 with pred_tab:
     pr = st.session_state.get("pred")
     if not pr:
-        st.info("Choose the two teams on the **Parsed data** tab and press "
-                "**Predict match**.", icon=":material/insights:")
+        st.info("Press **Predict match** at the bottom of the **Parsed data** "
+                "tab.", icon=":material/insights:")
     else:
         e, ctxv = pr["ens"], pr["ctx"]
         H, A = pr["home"], pr["away"]
