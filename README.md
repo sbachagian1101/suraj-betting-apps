@@ -7,6 +7,12 @@ full correct-score grid.
 
 ## How it works
 
+**Count.** Ten pasted pages are normally **nine distinct matches**: the
+head-to-head between the two teams you are predicting appears in both teams'
+sets of five. It is counted once — counting it twice would double-weight that
+fixture — and the app reports the duplicate by name rather than quietly
+dropping a page.
+
 **Parse.** A FootyStats page is mostly noise — league tables, top scorers, the
 footer in thirty languages. Four blocks carry everything worth having: the date
 line, the `TeamA vs TeamB` line, `Final Results` with the score, and the `Data`
@@ -71,6 +77,22 @@ form you pasted, not as a tested forecast.
 
 ## Traps found while building this
 
+**A library that is present locally and absent on Cloud.**
+`Styler.background_gradient` goes through matplotlib, which is not a Streamlit
+dependency. The score grid rendered here, where matplotlib happens to be
+installed, and the deployed app raised `background_gradient requires
+matplotlib` — below the fold of the Prediction tab, where a quick look does not
+reach. The colour scale is now interpolated directly, so the dependency is gone
+rather than added. `test_app.py` blocks matplotlib and runs the whole
+prediction path to keep it that way.
+
+**That regression test was vacuous at first.** `pandas.io.formats.style`
+decides `has_mpl` **once**, at import time. Earlier tests in the same process
+had already imported it while matplotlib was available, so blocking the module
+afterwards changed nothing and the test passed against the broken code. The
+block now purges the pandas style modules too, and has been confirmed to fail
+against the original bug before being trusted.
+
 **Club names contain digits.** Rejecting any candidate team name with a digit
 in it — a reasonable-looking way to avoid matching scores and dates — silently
 dropped *First Vienna FC 1894*, and with it one of Sturm Graz II's five
@@ -103,10 +125,12 @@ streamlit run app.py
 python test_model.py && python test_app.py
 ```
 
-181 checks — 148 on the parser, metrics and methods, 33 driving the app. The
-app checks press the Predict button and read the rendered grid, not just the
-landing page: a Streamlit app with a fatal error deeper in the script still
-serves HTTP 200 and still renders its first tab.
+190 checks — 152 on the parser, metrics and methods, 38 driving the app. The
+app checks press the Predict button, read the rendered grid, and run the whole
+prediction path again with **matplotlib blocked**, because that is the
+difference between this machine and Streamlit Cloud. A Streamlit app with a
+fatal error deeper in the script still serves HTTP 200 and still renders its
+first tab, so checking the landing page proves nothing.
 
 ---
 

@@ -13,6 +13,47 @@ import numpy as np
 from streamlit.testing.v1 import AppTest
 
 
+class _BlockMatplotlib:
+    """Make matplotlib un-importable for the duration of a test.
+
+    Streamlit Cloud does not install matplotlib, and this machine does. That
+    difference is the whole bug: `Styler.background_gradient` imports it
+    lazily, so the score grid rendered here and raised ImportError there, below
+    the fold of the Prediction tab where a quick look does not reach. Hiding
+    the module locally is the only way this class of failure gets caught before
+    a deploy.
+    """
+
+    def find_module(self, name, path=None):
+        return self if name.split(".")[0] == "matplotlib" else None
+
+    def find_spec(self, name, path=None, target=None):
+        if name.split(".")[0] == "matplotlib":
+            raise ImportError(f"{name} is blocked for this test")
+        return None
+
+    def __enter__(self):
+        import sys
+        # pandas.io.formats.style decides `has_mpl` ONCE, at import time. If an
+        # earlier test in this process already imported it while matplotlib was
+        # available, the flag stays True and blocking matplotlib does nothing -
+        # which is exactly how this test passed against the broken code. Purge
+        # the pandas style modules too so the flag is worked out again.
+        self._saved = {k: v for k, v in sys.modules.items()
+                       if k.split(".")[0] == "matplotlib"
+                       or k.startswith("pandas.io.formats.style")}
+        for k in self._saved:
+            del sys.modules[k]
+        sys.meta_path.insert(0, self)
+        return self
+
+    def __exit__(self, *a):
+        import sys
+        sys.meta_path.remove(self)
+        sys.modules.update(self._saved)
+        return False
+
+
 def main():
     fails, passes = [], 0
 
@@ -49,6 +90,11 @@ def main():
         return bail(at)
 
     check("matches were parsed and shown", len(at.dataframe) >= 3)
+    heads = " ".join(h.value for h in at.subheader)
+    check("pages read and distinct matches are both reported",
+          "pages read" in heads and "distinct matches" in heads)
+    check("the duplicated page is called out, not silently dropped",
+          any("pasted twice" in i.value for i in at.info))
     check("the teams can be chosen", len(at.selectbox) >= 2)
     opts = at.selectbox[0].options
     check("both teams are selectable", len(opts) >= 2)
@@ -114,6 +160,31 @@ def main():
     check("changing the recency half-life does not raise", not at.exception)
     at.slider[3].set_value(0.0).run()
     check("zeroing the friendly weight does not raise", not at.exception)
+
+    # ------------------------------------ the deployed environment has no
+    # matplotlib; prove the app does not need it
+    import importlib
+    with _BlockMatplotlib():
+        try:
+            importlib.import_module("matplotlib")
+            check("matplotlib really is blocked for this test", False)
+        except ImportError:
+            check("matplotlib really is blocked for this test", True)
+        at2 = AppTest.from_file("app.py", default_timeout=300).run()
+        at2.button[0].click().run()
+        pb2 = [i for i, b in enumerate(at2.button) if "Predict" in b.label]
+        if pb2:
+            at2.button[pb2[0]].click().run()
+        check("the whole prediction path runs without matplotlib",
+              not at2.exception)
+        if at2.exception:
+            for e in at2.exception:
+                print("EXCEPTION (no-matplotlib):", e.value)
+        else:
+            grids2 = [d.value for d in at2.dataframe
+                      if hasattr(d.value, "shape") and d.value.shape[0] >= 8
+                      and d.value.shape[1] >= 8]
+            check("and still renders the shaded score grid", len(grids2) >= 1)
 
     # ---------------------------------------------------------- the method tab
     check("the method tab lists the methods",

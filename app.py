@@ -53,10 +53,35 @@ CSS = """
 """
 
 
+# Styler.background_gradient goes through matplotlib, which is not a Streamlit
+# dependency: the gradient rendered locally, where matplotlib happens to be
+# installed, and the deployed app died with "background_gradient requires
+# matplotlib" the moment the Prediction tab scrolled to the score grid. Pulling
+# in matplotlib for one gradient costs ~50MB on every cold start, so the scale
+# is interpolated here instead. Same family as the openpyxl and scikit-learn
+# traps: a library that is present locally and absent on Cloud.
+_YLGNBU = [(255, 255, 217), (199, 233, 180), (127, 205, 187),
+           (65, 182, 196), (44, 127, 184), (37, 52, 148)]
+
+
+def _shade(v, vmax):
+    if not np.isfinite(v) or vmax <= 0:
+        return ""
+    t = float(np.clip(v / vmax, 0.0, 1.0)) ** 0.65
+    pos = t * (len(_YLGNBU) - 1)
+    i = int(np.floor(pos))
+    j = min(i + 1, len(_YLGNBU) - 1)
+    f = pos - i
+    r, g, b = (round(_YLGNBU[i][k] + f * (_YLGNBU[j][k] - _YLGNBU[i][k]))
+               for k in range(3))
+    fg = "#f5f7fa" if (0.299 * r + 0.587 * g + 0.114 * b) < 140 else "#10243b"
+    return f"background-color: rgb({r},{g},{b}); color: {fg}"
+
+
 @st.cache_data(show_spinner=False)
 def do_parse(text: str):
-    df = P.parse(text)
-    return df, P.teams(df)
+    df, dropped = P.parse(text, return_dropped=True)
+    return df, P.teams(df), dropped
 
 
 def cards(items):
@@ -143,7 +168,7 @@ if not raw.strip():
         st.info("Nothing parsed yet.", icon=":material/insights:")
     st.stop()
 
-df, ts = do_parse(raw)
+df, ts, dropped = do_parse(raw)
 if df.empty or len(ts) < 2:
     with data_tab:
         st.error("No complete matches were found. Each page needs its date "
@@ -153,7 +178,18 @@ if df.empty or len(ts) < 2:
 
 # ------------------------------------------------------------- parsed data
 with data_tab:
-    st.subheader(f"{len(df)} matches parsed")
+    pages = len(df) + len(dropped)
+    st.subheader(f"{pages} pages read · {len(df)} distinct matches")
+    if len(dropped):
+        rows = ", ".join(
+            f"{r.home} {int(r.hg)}-{int(r.ag)} {r.away} on {r.date:%d %b %Y}"
+            for _, r in dropped.iterrows())
+        st.info(
+            f"**{len(dropped)} page(s) were the same match pasted twice** and "
+            f"counted once: {rows}. The head-to-head between the two teams "
+            "you are predicting appears in both teams' sets of five — counting "
+            "it twice would double-weight that fixture.",
+            icon=":material/content_copy:")
     warn = P.warnings_for(df, ts)
     for w in warn:
         st.warning(w, icon=":material/report:")
@@ -268,9 +304,9 @@ with pred_tab:
         mat = pd.DataFrame(100 * m,
                            index=[f"{H[:14]} {i}" for i in range(m.shape[0])],
                            columns=[f"{A[:14]} {j}" for j in range(m.shape[1])])
+        vmax = float(np.nanmax(mat.to_numpy())) if mat.size else 1.0
         st.dataframe(
-            mat.style.background_gradient(cmap="YlGnBu", axis=None)
-               .format("{:.2f}"),
+            mat.style.map(lambda v: _shade(v, vmax)).format("{:.2f}"),
             width="stretch", height=340)
         st.caption("Every cell is the probability of that exact full-time "
                    "score, in percent. Rows are the home team's goals.")

@@ -36,12 +36,18 @@ class Checker:
 def main():
     c = Checker()
     text = open(SAMPLE, encoding="utf-8").read()
-    df = P.parse(text)
+    df, dropped = P.parse(text, return_dropped=True)
 
     # ------------------------------------------------------------ parsing
-    c.check("nine distinct matches are read", len(df), 9)
-    c.true("the duplicated head-to-head is de-duplicated",
+    c.check("ten pages are read", len(df) + len(dropped), 10)
+    c.check("nine distinct matches survive", len(df), 9)
+    c.check("one page is a duplicate", len(dropped), 1)
+    c.true("the duplicate is the head-to-head, kept once",
            len(df[(df.home == HOME) & (df.away == AWAY)]) == 1)
+    c.true("and the dropped page is that same fixture",
+           bool((dropped.iloc[0].home == HOME) and (dropped.iloc[0].away == AWAY)))
+    c.true("a plain parse still returns just the frame",
+           isinstance(P.parse(text), pd.DataFrame))
     c.true("every match has a date", df.date.notna().all())
     c.true("scores are non-negative", ((df.hg >= 0) & (df.ag >= 0)).all())
     c.true("xG was read for every match", df.h_xg.notna().all() and df.a_xg.notna().all())

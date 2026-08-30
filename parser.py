@@ -124,7 +124,15 @@ def classify(competition: str) -> str:
     return "League"
 
 
-def parse(text: str) -> pd.DataFrame:
+def parse(text: str, return_dropped: bool = False):
+    """Matches from pasted pages. With `return_dropped`, also the duplicates.
+
+    The head-to-head between the two teams being predicted appears in *both*
+    teams' sets, so ten pasted pages are normally nine distinct matches.
+    Counting it twice would double-weight that fixture, so it is dropped - but
+    silently dropping it makes the app look like it lost a page, so the
+    duplicates are handed back and reported.
+    """
     lines = text.replace("\r\n", "\n").split("\n")
     n = len(lines)
     matches: list[Match] = []
@@ -199,7 +207,8 @@ def parse(text: str) -> pd.DataFrame:
                              ht_hg=ht_hg, ht_ag=ht_ag, stats=stats))
         i = end
 
-    return _frame(matches)
+    df, dropped = _frame(matches)
+    return (df, dropped) if return_dropped else df
 
 
 def _read_stats(lines: list[str], j: int, end: int) -> dict:
@@ -236,9 +245,9 @@ def _read_stats(lines: list[str], j: int, end: int) -> dict:
     return out
 
 
-def _frame(matches: list[Match]) -> pd.DataFrame:
+def _frame(matches: list[Match]):
     if not matches:
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
     rows = []
     for m in matches:
         r = {k: v for k, v in asdict(m).items() if k != "stats"}
@@ -246,13 +255,19 @@ def _frame(matches: list[Match]) -> pd.DataFrame:
         r["kind"] = classify(m.competition)
         rows.append(r)
     df = pd.DataFrame(rows)
-    df = df.drop_duplicates(subset=["date", "home", "away"], keep="first")
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    key = ["date", "home", "away"]
+    dup = df.duplicated(subset=key, keep="first")
+    dropped = df[dup].copy()
+    df = df[~dup].copy()
+    for f in (df, dropped):
+        if not f.empty:
+            f["date"] = pd.to_datetime(f["date"], errors="coerce")
     df["total_goals"] = df.hg + df.ag
     df["btts"] = ((df.hg > 0) & (df.ag > 0)).astype(int)
     if "h_corners" in df and "a_corners" in df:
         df["total_corners"] = df.h_corners + df.a_corners
-    return df.sort_values("date", ascending=False).reset_index(drop=True)
+    return (df.sort_values("date", ascending=False).reset_index(drop=True),
+            dropped.reset_index(drop=True))
 
 
 def teams(df: pd.DataFrame) -> list[str]:
