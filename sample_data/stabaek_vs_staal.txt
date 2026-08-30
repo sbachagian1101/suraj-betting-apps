@@ -1,0 +1,49 @@
+Stabæk Fotball II
+Norway - 3. Division Group 4
+Recent : 6 Wins / 2 Draws / 8 Losses
+
+FormResultsPPG
+Overall
+WDDWL
+1.25
+Home
+LWLDW
+1.63
+Away
+WLWDL
+0.88
+StatsOverallHomeAway
+Win %38%50%25%
+AVG4.694.634.75
+Scored2.192.631.75
+Conceded2.502.003.00
+BTTS81%88%75%
+CS6%13%0%
+FTS13%0%25%
+xG1.561.571.56
+xGA1.771.512.07
+
+Staal Jørpeland Idrettslag
+Norway - 3. Division Group 4
+Recent : 5 Wins / 4 Draws / 7 Losses
+
+FormResultsPPG
+Overall
+DLLWL
+1.19
+Home
+LWDLL
+0.89
+Away
+DWLLW
+1.57
+StatsOverallHomeAway
+Win %31%22%43%
+AVG4.634.564.71
+Scored2.062.002.14
+Conceded2.562.562.57
+BTTS81%89%71%
+CS13%0%29%
+FTS6%11%0%
+xG1.351.391.33
+xGA1.951.981.93

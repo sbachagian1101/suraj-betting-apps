@@ -1,0 +1,49 @@
+Hønefoss BK
+Norway - 2 Division Group 2
+Recent : 10 Wins / 2 Draws / 4 Losses
+
+FormResultsPPG
+Overall
+WWWWL
+2.00
+Home
+WDWWW
+2.38
+Away
+LLWWL
+1.63
+StatsOverallHomeAway
+Win %63%75%50%
+AVG4.254.004.50
+Scored2.752.882.63
+Conceded1.501.131.88
+BTTS81%88%75%
+CS13%0%25%
+FTS6%13%0%
+xG1.821.741.9
+xGA1.391.341.43
+
+Follo FK
+Norway - 2 Division Group 2
+Recent : 3 Wins / 3 Draws / 10 Losses
+
+FormResultsPPG
+Overall
+DLLLW
+0.75
+Home
+LLLLL
+0.44
+Away
+LLDLW
+1.14
+StatsOverallHomeAway
+Win %19%11%29%
+AVG3.443.223.71
+Scored1.251.111.43
+Conceded2.192.112.29
+BTTS69%67%71%
+CS13%11%14%
+FTS25%22%29%
+xG1.291.41.11
+xGA1.661.631.71

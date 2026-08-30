@@ -1,0 +1,49 @@
+FK Bodo - Glimt
+Norway - Eliteserien
+League Pos. 1 / 16
+
+FormResultsPPG
+Overall
+WWWWW
+2.41
+Home
+WWWWW
+2.63
+Away
+WDWWW
+2.22
+StatsOverallHomeAway
+Win %76%88%67%
+AVG3.243.253.22
+Scored2.533.002.11
+Conceded0.710.251.11
+BTTS29%13%44%
+CS59%75%44%
+FTS12%13%11%
+xG2.222.591.89
+xGA0.930.631.2
+
+Rosenborg BK
+Norway - Eliteserien
+League Pos. 7 / 16
+
+FormResultsPPG
+Overall
+WWLWW
+1.41
+Home
+LDWWW
+1.89
+Away
+LLWLW
+0.88
+StatsOverallHomeAway
+Win %41%56%25%
+AVG2.763.112.38
+Scored1.472.000.88
+Conceded1.291.111.50
+BTTS35%56%13%
+CS35%33%38%
+FTS35%11%63%
+xG1.541.71.36
+xGA1.481.251.75

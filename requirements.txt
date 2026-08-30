@@ -1,0 +1,9 @@
+# scipy carries the Poisson and negative-binomial distributions the score
+# grid is built from; pyarrow backs the dataframes Streamlit serialises.
+# matplotlib is deliberately absent: the grid shading is interpolated in
+# app.py rather than taken from Styler.background_gradient, which imports it.
+streamlit>=1.57,<2
+pandas>=2.2,<3
+numpy>=2.0,<3
+scipy>=1.13,<2
+pyarrow>=16

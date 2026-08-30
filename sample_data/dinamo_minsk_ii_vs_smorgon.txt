@@ -1,0 +1,49 @@
+FK Dinamo Minsk II
+Belarus - First League
+League Pos. 11 / 18
+
+FormResultsPPG
+Overall
+LLLLW
+1.33
+Home
+WWLLL
+1.44
+Away
+LDLLW
+1.25
+StatsOverallHomeAway
+Win %38%44%33%
+AVG3.333.783.00
+Scored1.761.891.67
+Conceded1.571.891.33
+BTTS76%78%75%
+CS14%11%17%
+FTS14%11%17%
+xG1.171.291.07
+xGA1.21.131.28
+
+FC Smorgon
+Belarus - First League
+League Pos. 14 / 18
+
+FormResultsPPG
+Overall
+LLWWL
+1.10
+Home
+WLWWL
+1.18
+Away
+LDLLW
+1.00
+StatsOverallHomeAway
+Win %29%36%20%
+AVG2.572.732.40
+Scored1.141.181.10
+Conceded1.431.551.30
+BTTS33%27%40%
+CS33%36%30%
+FTS38%36%40%
+xG1.291.231.35
+xGA1.071.031.11

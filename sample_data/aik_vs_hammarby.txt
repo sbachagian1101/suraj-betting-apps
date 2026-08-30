@@ -1,0 +1,49 @@
+AIK Fotboll
+Sweden - Allsvenskan
+League Pos. 7 / 16
+
+FormResultsPPG
+Overall
+WDLWW
+1.65
+Home
+LLLWL
+1.29
+Away
+WWDWW
+1.90
+StatsOverallHomeAway
+Win %47%43%50%
+AVG2.942.713.10
+Scored1.471.001.80
+Conceded1.471.711.30
+BTTS65%29%90%
+CS18%29%10%
+FTS24%43%10%
+xG1.491.791.28
+xGA1.571.521.61
+
+Hammarby IF
+Sweden - Allsvenskan
+League Pos. 2 / 16
+
+FormResultsPPG
+Overall
+WDWWW
+2.00
+Home
+LWWWW
+2.50
+Away
+LLWDW
+1.38
+StatsOverallHomeAway
+Win %61%80%38%
+AVG3.173.602.63
+Scored2.333.101.38
+Conceded0.830.501.25
+BTTS44%40%50%
+CS44%60%25%
+FTS11%0%25%
+xG2.322.512.08
+xGA1.050.941.19
