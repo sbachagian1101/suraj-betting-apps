@@ -1,0 +1,8 @@
+# openpyxl is not optional: pandas.read_excel needs it to read the -T.xlsx
+# meeting exports and does not vendor it, so an upload works locally and
+# fails on Streamlit Cloud with ImportError: Missing optional dependency.
+streamlit>=1.57,<2
+pandas>=2.2,<3
+numpy>=2.0,<3
+openpyxl>=3.1,<4
+pyarrow>=16
