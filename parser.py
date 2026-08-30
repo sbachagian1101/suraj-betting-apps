@@ -278,6 +278,24 @@ def teams(df: pd.DataFrame) -> list[str]:
     return list(c.index)
 
 
+
+def subject_team(df: pd.DataFrame):
+    """Whose matches these are: the team appearing in nearly all of them.
+
+    A team's own five matches contain it five times and each opponent once, so
+    the subject is unambiguous. The tie margin is returned as well - if the top
+    two counts are level the paste is not one team's form and the caller should
+    say so rather than guess.
+    """
+    if df is None or df.empty:
+        return None, 0, 0
+    counts = pd.concat([df.home, df.away]).value_counts()
+    top = counts.index[0]
+    n1 = int(counts.iloc[0])
+    n2 = int(counts.iloc[1]) if len(counts) > 1 else 0
+    return top, n1, n2
+
+
 def team_matches(df: pd.DataFrame, team: str) -> pd.DataFrame:
     """One team's matches, flipped so the team is always the `for` side."""
     rows = []

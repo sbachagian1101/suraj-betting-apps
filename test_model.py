@@ -13,6 +13,8 @@ import metrics as M
 import parser as P
 
 SAMPLE = "sample_data/sturm_graz_ii_vs_rapid_wien_ii.txt"
+SAMPLE_HOME = "sample_data/home_sturm_graz_ii.txt"
+SAMPLE_AWAY = "sample_data/away_rapid_wien_ii.txt"
 HOME, AWAY = "Sturm Graz II", "Rapid Wien II"
 
 
@@ -86,6 +88,31 @@ def main():
     c.true("junk text yields an empty frame", P.parse("hello\nworld\n123").empty)
     c.true("a truncated page is skipped rather than half-read",
            P.parse("Saturday Aug 22, 2026 - 7:30pm\nA vs B\n").empty)
+
+    # ------------------------------------------- one box, one team
+    dh = P.parse(open(SAMPLE_HOME, encoding="utf-8").read())
+    da = P.parse(open(SAMPLE_AWAY, encoding="utf-8").read())
+    c.check("the home box holds five matches", len(dh), 5)
+    c.check("the away box holds five matches", len(da), 5)
+
+    sh, h1, h2 = P.subject_team(dh)
+    sa, a1, a2 = P.subject_team(da)
+    c.check("the home box names its team", sh, HOME)
+    c.check("the away box names its team", sa, AWAY)
+    c.true("the home team is in every one of its matches", h1 == 5)
+    c.true("and stands clear of the next-most-seen side", h1 - h2 >= 4)
+    c.true("the away team likewise", a1 == 5 and a1 - a2 >= 4)
+    c.check("an empty box names nobody", P.subject_team(None)[0], None)
+    c.check("so does an empty frame", P.subject_team(pd.DataFrame())[0], None)
+
+    pooled = pd.concat([dh, da], ignore_index=True).drop_duplicates(
+        subset=["date", "home", "away"])
+    c.check("pooling the two boxes gives nine distinct matches", len(pooled), 9)
+    c.check("with one overlap — the head-to-head",
+            len(dh) + len(da) - len(pooled), 1)
+    c.true("and the head-to-head is still form for both sides",
+           len(P.team_matches(pooled, HOME)) == 5
+           and len(P.team_matches(pooled, AWAY)) == 5)
 
     c.check("a friendly is classified", P.classify("Austria / Club Friendlies"),
             "Friendly")

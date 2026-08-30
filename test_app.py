@@ -78,13 +78,18 @@ def main():
     check("it names itself", any("Match Insight" in t.value for t in at.title))
     check("four tabs are present", len(at.tabs) >= 4)
     check("it asks for a paste first", len(at.info) >= 1)
-    check("a text area is offered", len(at.text_area) >= 1)
+    check("two text areas are offered — one per team", len(at.text_area) == 2)
+    check("it will not proceed until both are filled",
+          any("box" in i.value for i in at.info))
 
     # ---------------------------------------------- load the bundled example
     labels = [b.label for b in at.button]
     check("a sample loader is offered",
           any("bundled example" in l for l in labels))
+    check("and a way to clear both boxes", any("Clear both" in l for l in labels))
     at.button[0].click().run()
+    check("the loader fills both boxes",
+          all(t.value.strip() for t in at.text_area))
     check("loading the example does not raise", not at.exception)
     if at.exception:
         return bail(at)
@@ -93,11 +98,18 @@ def main():
     heads = " ".join(h.value for h in at.subheader)
     check("pages read and distinct matches are both reported",
           "pages read" in heads and "distinct matches" in heads)
-    check("the duplicated page is called out, not silently dropped",
-          any("pasted twice" in i.value for i in at.info))
-    check("the teams can be chosen", len(at.selectbox) >= 2)
-    opts = at.selectbox[0].options
-    check("both teams are selectable", len(opts) >= 2)
+    check("the overlap between the boxes is called out, not silently dropped",
+          any("both" in i.value and "counted once" in i.value
+              for i in at.info))
+
+    # the box decides the side; there is no dropdown to disagree with it
+    mets = {m.label: m.value for m in at.metric}
+    check("the home side is named from the home box",
+          mets.get("Home") == "Sturm Graz II")
+    check("the away side is named from the away box",
+          mets.get("Away") == "Rapid Wien II")
+    check("no home/away dropdown remains to contradict the boxes",
+          not any(sb.label in ("Home team", "Away team") for sb in at.selectbox))
 
     body = " ".join([m.value for m in at.markdown] + [c.value for c in at.caption])
     check("the parsed-data tab explains the indices",
@@ -160,6 +172,29 @@ def main():
     check("changing the recency half-life does not raise", not at.exception)
     at.slider[3].set_value(0.0).run()
     check("zeroing the friendly weight does not raise", not at.exception)
+
+    # ---------------------------------------- swapping the boxes swaps sides
+    at3 = AppTest.from_file("app.py", default_timeout=300).run()
+    at3.button[0].click().run()
+    h_text = at3.text_area[0].value
+    a_text = at3.text_area[1].value
+    at3.text_area[0].set_value(a_text).run()
+    at3.text_area[1].set_value(h_text).run()
+    check("swapping the two boxes does not raise", not at3.exception)
+    if not at3.exception:
+        m3 = {m.label: m.value for m in at3.metric}
+        check("the sides swap with the boxes",
+              m3.get("Home") == "Rapid Wien II" and m3.get("Away") == "Sturm Graz II")
+
+    # one team's form in both boxes is refused rather than modelled
+    at4 = AppTest.from_file("app.py", default_timeout=300).run()
+    at4.button[0].click().run()
+    same = at4.text_area[0].value
+    at4.text_area[1].set_value(same).run()
+    check("the same team in both boxes does not raise", not at4.exception)
+    if not at4.exception:
+        check("and is refused with a clear message",
+              any("Both boxes" in e.value for e in at4.error))
 
     # ------------------------------------ the deployed environment has no
     # matplotlib; prove the app does not need it

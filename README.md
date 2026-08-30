@@ -1,17 +1,24 @@
 # Match Insight
 
-Paste the last five FootyStats match pages for each of two teams. The app reads
-them, builds each side's rates, and runs **thirteen prediction methods** over
-those rates to produce 1X2, BTTS, over/under 2.5, corners over/under 8.5 and a
-full correct-score grid.
+**Two boxes: the home team's recent matches in one, the away team's in the
+other.** Paste FootyStats match pages into each. The app reads them, builds each
+side's rates, and runs **thirteen prediction methods** over those rates to
+produce 1X2, BTTS, over/under 2.5, corners over/under 8.5 and a full
+correct-score grid.
+
+Which side is at home comes from **which box you paste into**, not from a
+dropdown with no connection to the text. Each box holds one team's own matches,
+so that team appears in nearly all of them and each opponent once — which is
+how it is identified. If the two teams have met recently, that match belongs in
+**both** boxes: it is counted once, but it is still form for both sides.
 
 ## How it works
 
 **Count.** Ten pasted pages are normally **nine distinct matches**: the
-head-to-head between the two teams you are predicting appears in both teams'
-sets of five. It is counted once — counting it twice would double-weight that
-fixture — and the app reports the duplicate by name rather than quietly
-dropping a page.
+head-to-head appears in both boxes. It is pooled to one row — counting it twice
+would double-weight that fixture — but `team_matches` still picks it up for
+both sides, so neither team loses a game of form. The app reports the overlap
+rather than quietly dropping a page.
 
 **Parse.** A FootyStats page is mostly noise — league tables, top scorers, the
 footer in thirty languages. Four blocks carry everything worth having: the date
@@ -125,8 +132,9 @@ streamlit run app.py
 python test_model.py && python test_app.py
 ```
 
-190 checks — 152 on the parser, metrics and methods, 38 driving the app. The
-app checks press the Predict button, read the rendered grid, and run the whole
+210 checks — 164 on the parser, metrics and methods, 46 driving the app. The
+app checks fill both boxes, swap them to confirm the sides swap with them,
+press the Predict button, read the rendered grid, and run the whole
 prediction path again with **matplotlib blocked**, because that is the
 difference between this machine and Streamlit Cloud. A Streamlit app with a
 fatal error deeper in the script still serves HTTP 200 and still renders its

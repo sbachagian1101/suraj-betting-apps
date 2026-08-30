@@ -24,7 +24,8 @@ except ImportError as exc:
              icon=":material/error:")
     st.stop()
 
-SAMPLE = "sample_data/sturm_graz_ii_vs_rapid_wien_ii.txt"
+SAMPLE_HOME = "sample_data/home_sturm_graz_ii.txt"
+SAMPLE_AWAY = "sample_data/away_rapid_wien_ii.txt"
 
 CSS = """
 <style>
@@ -79,9 +80,42 @@ def _shade(v, vmax):
 
 
 @st.cache_data(show_spinner=False)
-def do_parse(text: str):
-    df, dropped = P.parse(text, return_dropped=True)
-    return df, P.teams(df), dropped
+def do_parse(home_text: str, away_text: str):
+    """Parse both boxes, name each team, and pool the matches.
+
+    Which side is at home comes from *which box the form was pasted into*, not
+    from a dropdown with no connection to the text. Each box holds one team's
+    own recent matches, so that team appears in nearly all of them and each
+    opponent once - which is what identifies it.
+
+    The two sets are then pooled for the baseline. They overlap by design when
+    the two teams have met: that head-to-head is one match and is counted once,
+    but it is still form for both sides, and `team_matches` picks it up for
+    each of them off the single pooled row.
+    """
+    dh, drop_h = P.parse(home_text, return_dropped=True)
+    da, drop_a = P.parse(away_text, return_dropped=True)
+    home, hn1, hn2 = P.subject_team(dh)
+    away, an1, an2 = P.subject_team(da)
+
+    frames = [f for f in (dh, da) if not f.empty]
+    if frames:
+        pooled = pd.concat(frames, ignore_index=True)
+        before = len(pooled)
+        pooled = pooled.drop_duplicates(subset=["date", "home", "away"],
+                                        keep="first")
+        pooled = pooled.sort_values("date", ascending=False)
+        pooled = pooled.reset_index(drop=True)
+        overlap = before - len(pooled)
+    else:
+        pooled, overlap = pd.DataFrame(), 0
+
+    pages = len(dh) + len(drop_h) + len(da) + len(drop_a)
+    return {"df": pooled, "home": home, "away": away,
+            "n_home": len(dh), "n_away": len(da),
+            "home_margin": hn1 - hn2, "away_margin": an1 - an2,
+            "pages": pages, "overlap": overlap,
+            "dupes": len(drop_h) + len(drop_a)}
 
 
 def cards(items):
@@ -141,63 +175,103 @@ paste_tab, data_tab, pred_tab, method_tab = st.tabs(
 
 # ------------------------------------------------------------------- paste
 with paste_tab:
-    c1, c2 = st.columns([1, 1])
-    if c1.button("Load the bundled example", width="stretch"):
-        st.session_state["raw"] = open(SAMPLE, encoding="utf-8").read()
-    if c2.button("Clear", width="stretch"):
-        st.session_state["raw"] = ""
+    b1, b2 = st.columns([1, 1])
+    if b1.button("Load the bundled example", width="stretch"):
+        st.session_state["raw_home"] = open(SAMPLE_HOME, encoding="utf-8").read()
+        st.session_state["raw_away"] = open(SAMPLE_AWAY, encoding="utf-8").read()
         st.session_state.pop("pred", None)
-    raw = st.text_area(
-        "Paste the FootyStats match pages — five for each team",
-        value=st.session_state.get("raw", ""), height=340,
-        placeholder="Copy each match page (Ctrl+A, Ctrl+C on the FootyStats "
-                    "match page) and paste them one after another here.")
-    st.session_state["raw"] = raw
-    st.caption("The parser needs four things from each page: the date line, "
-               "the `TeamA vs TeamB` line, `Final Results` with the score, and "
-               "the `Data` block. Everything else on the page is ignored. "
-               "Pages pasted twice — the head-to-head appears in both teams' "
-               "sets — are de-duplicated.")
+    if b2.button("Clear both", width="stretch"):
+        st.session_state["raw_home"] = ""
+        st.session_state["raw_away"] = ""
+        st.session_state.pop("pred", None)
 
-raw = st.session_state.get("raw", "")
-if not raw.strip():
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("##### :material/home: Home team")
+        st.caption("The side playing at home. Paste its recent match pages.")
+        st.text_area("Home team match pages", key="raw_home", height=320,
+                     label_visibility="collapsed",
+                     placeholder="Paste the home team's last matches here — "
+                                 "one FootyStats match page after another.")
+    with c2:
+        st.markdown("##### :material/flight_takeoff: Away team")
+        st.caption("The side playing away. Paste its recent match pages.")
+        st.text_area("Away team match pages", key="raw_away", height=320,
+                     label_visibility="collapsed",
+                     placeholder="Paste the away team's last matches here — "
+                                 "one FootyStats match page after another.")
+
+    st.caption(
+        "Which side is at home comes from **which box you paste into**. Each "
+        "box should hold one team's own recent matches; that team is the one "
+        "appearing in nearly all of them, which is how it is identified. The "
+        "parser needs four things from each page: the date line, the "
+        "`TeamA vs TeamB` line, `Final Results` with the score, and the `Data` "
+        "block — everything else is ignored. If the two teams have met "
+        "recently, that match belongs in **both** boxes: it is counted once, "
+        "but it is still form for both sides.")
+
+raw_home = st.session_state.get("raw_home", "")
+raw_away = st.session_state.get("raw_away", "")
+if not raw_home.strip() or not raw_away.strip():
+    if not raw_home.strip() and not raw_away.strip():
+        which = "both boxes"
+    elif not raw_home.strip():
+        which = "the home box"
+    else:
+        which = "the away box"
     with data_tab:
-        st.info("Paste some match pages on the first tab to begin.",
-                icon=":material/content_paste:")
+        st.info(f"Fill {which} on the first tab to begin — one team's matches "
+                "in each.", icon=":material/content_paste:")
     with pred_tab:
         st.info("Nothing parsed yet.", icon=":material/insights:")
     st.stop()
 
-df, ts, dropped = do_parse(raw)
-if df.empty or len(ts) < 2:
+R = do_parse(raw_home, raw_away)
+df, home, away = R["df"], R["home"], R["away"]
+
+problem = None
+if df.empty or not home or not away:
+    problem = ("No complete matches were found. Each page needs its date "
+               "line, the `vs` line, `Final Results` and the `Data` block.")
+elif home == away:
+    problem = (f"Both boxes look like **{home}**'s matches. Put one team's "
+               "form in each box.")
+elif R["home_margin"] < 1 or R["away_margin"] < 1:
+    problem = ("A box does not look like one team's form — no single team "
+               "appears in most of its matches. Each box should hold the "
+               "recent matches of one team.")
+if problem:
     with data_tab:
-        st.error("No complete matches were found. Each page needs its date "
-                 "line, the `vs` line, `Final Results` and the `Data` block.",
-                 icon=":material/error:")
+        st.error(problem, icon=":material/error:")
+    with pred_tab:
+        st.info("Nothing to predict yet.", icon=":material/insights:")
     st.stop()
 
 # ------------------------------------------------------------- parsed data
 with data_tab:
-    pages = len(df) + len(dropped)
-    st.subheader(f"{pages} pages read · {len(df)} distinct matches")
-    if len(dropped):
-        rows = ", ".join(
-            f"{r.home} {int(r.hg)}-{int(r.ag)} {r.away} on {r.date:%d %b %Y}"
-            for _, r in dropped.iterrows())
-        st.info(
-            f"**{len(dropped)} page(s) were the same match pasted twice** and "
-            f"counted once: {rows}. The head-to-head between the two teams "
-            "you are predicting appears in both teams' sets of five — counting "
-            "it twice would double-weight that fixture.",
-            icon=":material/content_copy:")
-    warn = P.warnings_for(df, ts)
-    for w in warn:
-        st.warning(w, icon=":material/report:")
-
+    st.subheader(f"{R['pages']} pages read · {len(df)} distinct matches")
     c1, c2, c3 = st.columns([2, 2, 1])
-    home = c1.selectbox("Home team", ts, index=min(1, len(ts) - 1))
-    away = c2.selectbox("Away team", [t for t in ts if t != home], index=0)
-    c3.metric("Teams seen", len(ts))
+    c1.metric("Home", home, f"{R['n_home']} matches pasted",
+              delta_color="off")
+    c2.metric("Away", away, f"{R['n_away']} matches pasted",
+              delta_color="off")
+    c3.metric("Teams seen", len(P.teams(df)))
+
+    if R["overlap"] or R["dupes"]:
+        bits = []
+        if R["overlap"]:
+            bits.append(f"{R['overlap']} match appears in **both** boxes — the "
+                        "head-to-head between these two teams")
+        if R["dupes"]:
+            bits.append(f"{R['dupes']} page(s) were pasted twice inside one box")
+        st.info(" · ".join(bits) + ". Each is counted once, because counting it "
+                "twice would double-weight that fixture — but a head-to-head "
+                "is still form for **both** sides and is used for both.",
+                icon=":material/content_copy:")
+
+    for w in P.warnings_for(df, [home, away]):
+        st.warning(w, icon=":material/report:")
 
     base = M.sample_baselines(df)
     ph = M.team_profile(df, home, base, half_life, kind_weight)
