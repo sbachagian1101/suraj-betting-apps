@@ -1,0 +1,8 @@
+# scipy carries the Poisson, negative-binomial and Skellam distributions the
+# prediction methods are built on; pyarrow backs the dataframes Streamlit
+# serialises to the browser.
+streamlit>=1.57,<2
+pandas>=2.2,<3
+numpy>=2.0,<3
+scipy>=1.13,<2
+pyarrow>=16
