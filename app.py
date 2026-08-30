@@ -34,8 +34,33 @@ def bundle():
     return P.load_bundle()
 
 
+# Streamlit Cloud pulls new code but keeps already-imported modules in
+# sys.modules, so a commit that ADDS a name to a helper module can leave the new
+# app.py running against the old module. It fails deep inside whichever tab uses
+# the new symbol, as an opaque AttributeError, long after the page has rendered
+# fine. Checking up front turns it into one actionable sentence.
+_REQUIRED = {"data": ("read_race_file", "jockey_columns", "build_features",
+                      "shin_devig", "market_probability", "prepare"),
+             "predict": ("load_bundle", "score_race")}
+_stale = [f"{m}.{n}" for m, names in _REQUIRED.items()
+          for n in names if not hasattr({"data": D, "predict": P}[m], n)]
+if _stale:
+    st.error(
+        "**This deployment is running stale code.** Missing `"
+        + "`, `".join(_stale)
+        + "`, which the current `app.py` needs. Streamlit Cloud pulled the new "
+          "files but kept the old modules in memory. Fix it with "
+          "**Manage app → ⋮ → Reboot app**.", icon=":material/error:")
+    st.stop()
+
 B = bundle()
 V = B["validation"]
+if "jockey_validation" not in B:
+    st.error(
+        "**The saved model is out of date** — it has no jockey-only model. "
+        "Re-run `python train.py` and commit the new `model_bundle.joblib`.",
+        icon=":material/error:")
+    st.stop()
 J = B["jockey_validation"]      # used by the sidebar and the Method tab
 
 st.title("HorsePredictorPro")
