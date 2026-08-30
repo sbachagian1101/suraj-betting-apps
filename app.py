@@ -57,8 +57,12 @@ B = bundle()
 V = B["validation"]
 if "jockey_validation" not in B:
     st.error(
-        "**The saved model is out of date** — it has no jockey-only model. "
-        "Re-run `python train.py` and commit the new `model_bundle.joblib`.",
+        "**The loaded model has no jockey-only component.** Almost always this "
+        "is a cached bundle rather than a missing file: `@st.cache_resource` "
+        "is still holding the previous `model_bundle.joblib`. Fix it with "
+        "**Manage app → ⋮ → Reboot app**. If it survives a reboot, the "
+        "committed bundle really is old — re-run `python train.py` and commit "
+        "the result.",
         icon=":material/error:")
     st.stop()
 J = B["jockey_validation"]      # used by the sidebar and the Method tab
