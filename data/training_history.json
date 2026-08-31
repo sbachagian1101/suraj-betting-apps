@@ -1,0 +1,52 @@
+[
+  {
+    "timestamp": "2026-08-02T07:20:54",
+    "event": "initial_seed_training",
+    "meetings": 5,
+    "races_added": 35,
+    "training_pairs": 1358,
+    "metrics": {
+      "evaluated_races": 35,
+      "winner_top1_pct": 25.714285714285715,
+      "winner_top3_pct": 57.142857142857146,
+      "mean_winner_rank": 4.228571428571429,
+      "pairwise_accuracy_pct": 63.328424153166424,
+      "mean_known_top4_overlap_pct": 48.57142857142857,
+      "metric_scope": "Training-fit diagnostics; leave-one-meeting-out and future chronological testing are required for honest validation.",
+      "leave_one_meeting_out": {
+        "evaluated_races": 35,
+        "winner_top1_pct": 25.714285714285715,
+        "winner_top3_pct": 48.57142857142857,
+        "mean_winner_rank": 4.371428571428571,
+        "pairwise_accuracy_pct": 62.00294550810015,
+        "mean_known_top4_overlap_pct": 47.85714285714286
+      },
+      "baseline_all_records": {
+        "evaluated_races": 35,
+        "winner_top1_pct": 25.714285714285715,
+        "winner_top3_pct": 51.42857142857143,
+        "mean_winner_rank": 4.571428571428571,
+        "pairwise_accuracy_pct": 59.499263622974965,
+        "mean_known_top4_overlap_pct": 43.57142857142857,
+        "metric_scope": "Training-fit diagnostics; leave-one-meeting-out and future chronological testing are required for honest validation."
+      }
+    }
+  },
+  {
+    "timestamp": "2026-08-02T12:58:58",
+    "event": "live_retrain",
+    "races_added": 4,
+    "races_replaced": 0,
+    "training_races": 39,
+    "training_pairs": 1514,
+    "metrics": {
+      "evaluated_races": 39,
+      "winner_top1_pct": 23.076923076923077,
+      "winner_top3_pct": 56.41025641025641,
+      "mean_winner_rank": 4.3076923076923075,
+      "pairwise_accuracy_pct": 64.2007926023778,
+      "mean_known_top4_overlap_pct": 48.717948717948715,
+      "metric_scope": "Training-fit diagnostics; leave-one-meeting-out and future chronological testing are required for honest validation."
+    }
+  }
+]

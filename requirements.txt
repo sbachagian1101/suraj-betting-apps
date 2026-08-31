@@ -1,0 +1,7 @@
+# numpy is optional for the engine — it falls back to pure Python — but it is
+# a large speed-up on retraining, so it is pinned rather than left to chance.
+# matplotlib is deliberately absent; nothing here needs it.
+streamlit>=1.57,<2
+pandas>=2.2,<3
+numpy>=1.26,<3
+pyarrow>=16
