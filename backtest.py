@@ -36,10 +36,10 @@ def main() -> int:
     for name, order in RESULTS.items():
         race = load(name)
         rated, _ = rating.rate(race)
-        by_box = {x.box: x for x in rated}
+        by_box = {x.tab: x for x in rated}
         win = by_box[order[0]]
         pick = rated[0]
-        hits += pick.box == order[0]
+        hits += pick.tab == order[0]
         n = len(rated)
         lb = -math.log(max(win.p_final, 1e-9))
         lm = -math.log(max(win.p_model, 1e-9))

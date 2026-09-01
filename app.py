@@ -1,4 +1,5 @@
-"""DogForm - paste a Racing & Sports greyhound Full Fields page, get a rating."""
+"""RaceForm - paste an R&S Full Fields page (greyhound, thoroughbred or
+harness) and get a rated field."""
 
 from __future__ import annotations
 
@@ -13,8 +14,9 @@ import streamlit as st
 
 import rating
 import rs_parser
+from rs_parser import GREYHOUND, HARNESS, THOROUGHBRED
 
-st.set_page_config(page_title="DogForm", page_icon="🐕", layout="wide")
+st.set_page_config(page_title="RaceForm", page_icon="🏇", layout="wide")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -23,8 +25,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # module after a push that added a module-level name, producing an opaque
 # AttributeError halfway down the page.  Turn that into one actionable line.
 _REQUIRED = {
-    "rs_parser": ["parse", "Race", "Runner", "STRAIGHT_TRACKS"],
-    "rating": ["rate", "Params", "quinellas", "sensitivity", "Rated"],
+    "rs_parser": ["parse", "Race", "Runner", "Run", "GREYHOUND", "THOROUGHBRED",
+                  "HARNESS", "STRAIGHT_TRACKS", "METRES_PER_LENGTH"],
+    "rating": ["rate", "Params", "quinellas", "sensitivity", "Rated",
+               "defaults_for", "CODE_DEFAULTS"],
 }
 _missing = []
 for _mod, _names in _REQUIRED.items():
@@ -37,97 +41,66 @@ if _missing:
           "rebuild. The pushed source is fine.")
     st.stop()
 
+CODE_LABEL = {GREYHOUND: "🐕 Greyhound", THOROUGHBRED: "🏇 Thoroughbred",
+              HARNESS: "🛞 Harness"}
+
 
 # --- helpers ------------------------------------------------------------------
 
 def samples() -> dict[str, str]:
-    out = {}
-    for path in sorted(glob.glob(os.path.join(HERE, "fixtures", "*.txt"))):
-        out[os.path.basename(path).replace(".txt", "")] = path
-    return out
+    return {os.path.basename(p).replace(".txt", ""): p
+            for p in sorted(glob.glob(os.path.join(HERE, "fixtures", "*.txt")))}
 
 
 def money(v: float | None, dp: int = 2) -> str:
-    """Format a price for a *markdown* context.
-
-    Streamlit renders markdown with LaTeX enabled, so two bare `$` on one line
-    are swallowed as inline math ("$10 against a fair $8.60" loses both signs).
-    Escape them.
-    """
-    if not v:
-        return "—"
-    return "\\$" + (f"{v:g}" if dp is None else f"{v:.{dp}f}")
+    """Price for a *markdown* context.  Streamlit renders markdown with LaTeX
+    on, so two bare `$` on one line are swallowed as inline math."""
+    return "—" if not v else "\\$" + f"{v:.{dp}f}"
 
 
 def fmt_odds(v: float | None) -> str:
-    """Plain (unescaped) price, for non-markdown contexts such as st.metric."""
+    """Plain price, for non-markdown contexts such as st.metric."""
     return f"${v:g}" if v else "—"
 
 
-def prediction_frame(rated: list[rating.Rated]) -> pd.DataFrame:
-    return pd.DataFrame([{
-        "Box": r.box,
-        "Runner": r.name,
-        "Odds": r.odds,
-        "Win %": r.p_final * 100,
-        "Top 2 %": r.p_top2 * 100,
-        "Place %": r.p_top3 * 100,
-        "Fair $": r.fair,
-        "EV %": (r.ev * 100) if r.ev is not None else None,
-        "Model %": r.p_model * 100,
-        "Market %": (r.p_market * 100) if r.p_market is not None else None,
-    } for r in rated])
+def runs_frame(r: rating.Rated, code: str) -> pd.DataFrame:
+    rows = []
+    for run in r.runner.runs:
+        base = {
+            "Fin": (run.dq_code if run.disqualified else
+                    (f"{run.pos} of {run.field_size}" if run.field_size
+                     else f"{run.pos} of ?")),
+            "Margin": run.margin,
+            "Date": run.run_date,
+            "Days": run.days_ago,
+            "Trk": run.track,
+            "Dist": run.dist_m,
+            "Surf": run.surface,
+            "SP": run.sp,
+        }
+        if code == GREYHOUND:
+            base |= {"Box": run.box, "Sec": run.sectional, "Kind": run.track_kind}
+        elif code == THOROUGHBRED:
+            base |= {"Going": run.going, "Wt": run.weight, "BP": run.box,
+                     "Jockey": run.jockey}
+        else:
+            base |= {"Hcp m": run.handicap_m, "Driver": run.jockey,
+                     "Raw": (f"{run.margin_raw:g}{run.margin_unit}"
+                             if run.margin_raw is not None else None)}
+        rows.append(base)
+    return pd.DataFrame(rows)
 
-
-# --- sidebar ------------------------------------------------------------------
-
-with st.sidebar:
-    st.header("Model settings")
-    st.caption("Defaults are the ones the write-up was built on. "
-               "Change them to see how fragile a selection is.")
-
-    p = rating.Params()
-    p.market_weight = st.slider(
-        "Weight on the form model", 0.0, 1.0, 0.38, 0.02,
-        help="0 = follow the market exactly. 1 = ignore the market. "
-             "The blend is a weighted geometric mean in log space.")
-    p.spread = st.slider(
-        "Performance spread (lengths)", 1.5, 4.0, 2.40, 0.05,
-        help="Assumed SD of a runner's performance. Higher = flatter, "
-             "less confident probabilities.")
-    p.prior_starts = st.slider(
-        "Shrinkage prior (starts)", 5.0, 30.0, 15.0, 1.0,
-        help="How many starts of prior belief the distance / course / surface "
-             "records are shrunk toward the career strike rate. Lower values "
-             "let tiny samples swing the rating hard — that has cost a race.")
-
-    with st.expander("Advanced"):
-        p.tau_days = st.slider("Recency decay (days)", 60.0, 400.0, 200.0, 10.0)
-        p.sigma_dist = st.slider("Distance relevance width (m)", 40.0, 160.0, 90.0, 5.0)
-        p.w_straight = st.slider("Straight-track form weight", 0.0, 1.0, 0.35, 0.05)
-        p.w_offsurface = st.slider("Off-surface form weight", 0.0, 1.0, 0.70, 0.05)
-        p.w_foreign = st.slider("Overseas form weight", 0.0, 1.0, 0.75, 0.05)
-        p.devig_power = st.slider("De-vig power", 1.0, 1.20, 1.06, 0.01)
-        p.k_gap = st.slider(
-            "Vacant-box term (lengths per empty box inside)", 0.0, 1.0, 0.0, 0.05,
-            help="UNVALIDATED. In one race the finish order was exactly monotone "
-                 "in vacant boxes inside each runner. That is a single "
-                 "observation, so this ships at zero. Turn it on to explore.")
-
-    run_sens = st.checkbox("Run parameter sensitivity sweep", value=True,
-                           help="Re-rates the race a few hundred times with "
-                                "jittered constants to see if the selection holds.")
 
 # --- input --------------------------------------------------------------------
 
-st.title("🐕 DogForm")
-st.caption("Paste a Racing & Sports greyhound **Full Fields** page. "
-           "The app reads each runner's last-10 run table, rates the field in "
-           "lengths, and blends with the market.")
+st.title("🏇 RaceForm")
+st.caption("Paste a Racing & Sports **Full Fields** page — greyhound, "
+           "thoroughbred or harness. The app reads each runner's last-10 run "
+           "table, rates the field in lengths, and blends with the market.")
 
 sample_map = samples()
-c1, c2 = st.columns([3, 1])
-with c2:
+_, right = st.columns([3, 1])
+with right:
     pick = st.selectbox("Load a sample race", ["—"] + list(sample_map), index=0)
 if pick != "—" and st.session_state.get("_loaded") != pick:
     st.session_state["raw"] = io.open(sample_map[pick], encoding="utf-8").read()
@@ -135,10 +108,9 @@ if pick != "—" and st.session_state.get("_loaded") != pick:
 
 raw = st.text_area(
     "Paste the page here (select all → copy on the Full Fields tab)",
-    key="raw", height=220,
-    placeholder="HomeForm GuideGreyhoundAustralia… / 340m ALL WEATHER GOOD / …")
-
-go = st.button("Analyse race", type="primary")
+    key="raw", height=200,
+    placeholder="HomeForm GuideThoroughbredFrance… / 1600m TURF GOOD / …")
+st.button("Analyse race", type="primary")
 
 if not raw or not raw.strip():
     st.info("Paste a Full Fields page, or load one of the sample races above.")
@@ -150,6 +122,70 @@ if not race.field_:
     for w in race.warnings:
         st.warning(w)
     st.stop()
+
+# --- sidebar (rendered after parsing so the defaults match the code) ----------
+
+d = rating.defaults_for(race.code)
+with st.sidebar:
+    st.header("Model settings")
+    st.caption(f"Detected **{CODE_LABEL[race.code]}**. Defaults are tuned per "
+               "code — a greyhound sprint is decided inside 3 lengths, a French "
+               "trot can be 70.")
+    p = rating.defaults_for(race.code)
+    p.market_weight = st.slider(
+        "Weight on the form model", 0.0, 1.0, d.market_weight, 0.02,
+        help="0 = follow the market exactly. 1 = ignore it. The blend is a "
+             "weighted geometric mean in log space.")
+    p.spread = st.slider(
+        "Performance spread (lengths)", 1.0, max(20.0, d.spread * 2), d.spread,
+        0.05, help="Assumed SD of a runner's performance. Higher = flatter, "
+                   "less confident probabilities.")
+    p.prior_starts = st.slider(
+        "Shrinkage prior (starts)", 5.0, 30.0, d.prior_starts, 1.0,
+        help="How many starts of prior belief the distance / course / surface "
+             "records are shrunk toward the career strike rate. Lower lets tiny "
+             "samples swing the rating hard — that has cost a race.")
+
+    if race.code == THOROUGHBRED:
+        st.subheader("Thoroughbred")
+        p.lengths_per_kg = st.slider(
+            "Lengths per kg", 0.0, 1.5, d.lengths_per_kg, 0.05,
+            help="Weight scale. A past run under a lighter weight flatters the "
+                 "horse relative to today's mark.")
+        p.k_barrier = st.slider("Barrier penalty (widest draw)", 0.0, 2.5,
+                                d.k_barrier, 0.05)
+    elif race.code == HARNESS:
+        st.subheader("Harness")
+        p.k_dq = st.slider(
+            "Non-finish penalty (lengths)", 0.0, 8.0, d.k_dq, 0.1,
+            help="A DQG (broke gait) is not a result, so those runs are dropped "
+                 "from the margin average. This scores the RATE of it instead.")
+        p.handicap_credit = st.slider(
+            "Distance-handicap credit", 0.0, 1.0, d.handicap_credit, 0.05,
+            help="Share of a +25m handicap credited back to a past margin.")
+    else:
+        st.subheader("Greyhound")
+        p.k_sectional = st.slider("Early-speed weight", 0.0, 1.5,
+                                  d.k_sectional, 0.05)
+        p.k_gap = st.slider(
+            "Vacant-box term (lengths per empty box inside)", 0.0, 1.0, 0.0, 0.05,
+            help="UNVALIDATED. In one race the finish order was exactly monotone "
+                 "in vacant boxes inside each runner. One observation, so it "
+                 "ships at zero.")
+
+    with st.expander("Advanced"):
+        p.tau_days = st.slider("Recency decay (days)", 60.0, 400.0, d.tau_days, 10.0)
+        p.sigma_dist = st.slider("Distance relevance width (m)", 40.0,
+                                 max(400.0, d.sigma_dist * 2), d.sigma_dist, 5.0)
+        p.w_offsurface = st.slider("Off-surface form weight", 0.0, 1.0,
+                                   d.w_offsurface, 0.05)
+        p.w_straight = st.slider("Straight-track form weight", 0.0, 1.0,
+                                 d.w_straight, 0.05)
+        p.w_foreign = st.slider("Overseas form weight", 0.0, 1.0, d.w_foreign, 0.05)
+        p.k_field = st.slider("Field-size credit", 0.0, 1.0, d.k_field, 0.01)
+        p.devig_power = st.slider("De-vig power", 1.0, 1.20, d.devig_power, 0.01)
+
+    run_sens = st.checkbox("Run parameter sensitivity sweep", value=True)
 
 rated, notes = rating.rate(race, p)
 if not rated:
@@ -166,20 +202,21 @@ hdr = f"{race.track} R{race.race_no} — {race.dist_m}m {race.surface} {race.goi
 if race.grade:
     hdr += f" · {race.grade}"
 st.subheader(hdr)
-st.caption(f"{race.race_date:%A, %d %B %Y} · {len(race.field_)} runners"
-           + (f" · {sum(1 for r in race.runners if r.scratched)} scratched"
-              if any(r.scratched for r in race.runners) else "")
-           if race.race_date else f"{len(race.field_)} runners")
+bits = [CODE_LABEL[race.code], f"{len(race.field_)} runners"]
+if race.race_date:
+    bits.insert(1, f"{race.race_date:%A, %d %B %Y}")
+if any(r.scratched for r in race.runners):
+    bits.append(f"{sum(1 for r in race.runners if r.scratched)} scratched")
+st.caption(" · ".join(bits))
 
 with st.container(horizontal=True):
-    st.metric("Selection", f"{top.box}. {top.name}", border=True)
+    st.metric("Selection", f"{top.tab}. {top.name}", border=True)
     st.metric("Win probability", f"{top.p_final*100:.1f}%", border=True)
     st.metric("Fair price", f"${top.fair:.2f}",
               delta=(f"{top.ev*100:+.0f}% EV at {fmt_odds(top.odds)}"
-                     if top.ev is not None else None),
-              border=True)
+                     if top.ev is not None else None), border=True)
     if fav:
-        st.metric("Market favourite", f"{fav.box}. {fav.name}",
+        st.metric("Market favourite", f"{fav.tab}. {fav.name}",
                   delta="agrees" if fav is top else "model disagrees",
                   delta_color="normal" if fav is top else "inverse", border=True)
 
@@ -194,21 +231,26 @@ tab_pred, tab_run, tab_diag, tab_method = st.tabs(
 # --- prediction ---------------------------------------------------------------
 
 with tab_pred:
-    df = prediction_frame(rated)
-    st.dataframe(
-        df, hide_index=True,
-        column_config={
-            "Odds": st.column_config.NumberColumn("Odds", format="$%.2f"),
-            "Win %": st.column_config.ProgressColumn(
-                "Win %", format="%.1f%%", min_value=0.0,
-                max_value=float(max(df["Win %"].max(), 1.0))),
-            "Top 2 %": st.column_config.NumberColumn(format="%.1f%%"),
-            "Place %": st.column_config.NumberColumn(format="%.1f%%"),
-            "Fair $": st.column_config.NumberColumn(format="$%.2f"),
-            "EV %": st.column_config.NumberColumn(format="%+.1f%%"),
-            "Model %": st.column_config.NumberColumn(format="%.1f%%"),
-            "Market %": st.column_config.NumberColumn(format="%.1f%%"),
-        })
+    df = pd.DataFrame([{
+        "No.": r.tab, "Runner": r.name, "Odds": r.odds,
+        "Win %": r.p_final * 100, "Top 2 %": r.p_top2 * 100,
+        "Place %": r.p_top3 * 100, "Fair $": r.fair,
+        "EV %": (r.ev * 100) if r.ev is not None else None,
+        "Model %": r.p_model * 100,
+        "Market %": (r.p_market * 100) if r.p_market is not None else None,
+    } for r in rated])
+    st.dataframe(df, hide_index=True, column_config={
+        "Odds": st.column_config.NumberColumn(format="$%.2f"),
+        "Win %": st.column_config.ProgressColumn(
+            "Win %", format="%.1f%%", min_value=0.0,
+            max_value=float(max(df["Win %"].max(), 1.0))),
+        "Top 2 %": st.column_config.NumberColumn(format="%.1f%%"),
+        "Place %": st.column_config.NumberColumn(format="%.1f%%"),
+        "Fair $": st.column_config.NumberColumn(format="$%.2f"),
+        "EV %": st.column_config.NumberColumn(format="%+.1f%%"),
+        "Model %": st.column_config.NumberColumn(format="%.1f%%"),
+        "Market %": st.column_config.NumberColumn(format="%.1f%%"),
+    })
 
     left, right = st.columns(2)
     with left:
@@ -216,19 +258,19 @@ with tab_pred:
             st.markdown("**Model vs market**")
             long = []
             for r in rated:
-                long.append({"Runner": f"{r.box}. {r.name}",
+                long.append({"Runner": f"{r.tab}. {r.name}",
                              "Source": "Form model", "Probability": r.p_model * 100})
                 if r.p_market is not None:
-                    long.append({"Runner": f"{r.box}. {r.name}",
+                    long.append({"Runner": f"{r.tab}. {r.name}",
                                  "Source": "Market", "Probability": r.p_market * 100})
             chart = alt.Chart(pd.DataFrame(long)).mark_bar().encode(
                 x=alt.X("Probability:Q", title="Win probability (%)"),
-                y=alt.Y("Runner:N", sort=[f"{r.box}. {r.name}" for r in rated],
+                y=alt.Y("Runner:N", sort=[f"{r.tab}. {r.name}" for r in rated],
                         title=None),
-                yOffset="Source:N",
-                color=alt.Color("Source:N", title=None),
-                tooltip=["Runner", "Source", alt.Tooltip("Probability:Q", format=".1f")],
-            ).properties(height=28 * len(rated) + 40)
+                yOffset="Source:N", color=alt.Color("Source:N", title=None),
+                tooltip=["Runner", "Source",
+                         alt.Tooltip("Probability:Q", format=".1f")],
+            ).properties(height=24 * len(rated) + 40)
             st.altair_chart(chart)
             st.caption("Where the two disagree is where the model is taking a "
                        "position. That is also where it can be wrong.")
@@ -239,16 +281,14 @@ with tab_pred:
             overlays = [r for r in rated if r.ev is not None and r.ev > 0]
             if overlays:
                 for r in overlays:
-                    st.write(f"**{r.box}. {r.name}** — {money(r.odds)} "
-                             f"against a fair {money(r.fair)} · "
-                             f"**{r.ev*100:+.1f}% EV**")
+                    st.write(f"**{r.tab}. {r.name}** — {money(r.odds)} against a "
+                             f"fair {money(r.fair)} · **{r.ev*100:+.1f}% EV**")
                 st.caption("An overlay is the model disagreeing with the market. "
-                           "On this model's short record, its value picks have not "
+                           "On this model's short record its value picks have not "
                            "won — treat them as a hypothesis, not a tip.")
             else:
                 st.write("No runner is priced above its modelled chance. "
                          "On this race the model has no bet.")
-
         with st.container(border=True):
             st.markdown("**Most likely first two (either order)**")
             for label, prob in rating.quinellas(rated):
@@ -261,81 +301,98 @@ with tab_run:
     st.caption("Every term is in **lengths**. Positive helps, negative hurts. "
                "`form` is the weighted average beaten margin, negated.")
     for r in rated:
-        head = (f"{r.box}. {r.name} — {r.p_final*100:.1f}%  ·  {fmt_odds(r.odds)}"
-                f"  ·  rating {r.rating:+.2f}L")   # expander label: not markdown
+        head = (f"{r.tab}. {r.name} — {r.p_final*100:.1f}%  ·  "
+                f"{fmt_odds(r.odds)}  ·  rating {r.rating:+.2f}L")
         with st.expander(head):
             a, b = st.columns([1, 2])
             with a:
                 st.markdown("**Rating terms**")
-                tf = pd.DataFrame(
-                    [{"Term": k, "Lengths": v} for k, v in r.terms.items()])
-                st.dataframe(tf, hide_index=True, column_config={
-                    "Lengths": st.column_config.NumberColumn(format="%+.2f")})
-                st.caption(
-                    f"box {r.box} (effective {r.eff_box} from the rail, "
-                    f"{r.gap_inside} vacant inside) · evidence "
-                    f"{r.evidence:.2f} effective runs")
+                st.dataframe(
+                    pd.DataFrame([{"Term": k, "Lengths": v}
+                                  for k, v in r.terms.items()]),
+                    hide_index=True,
+                    column_config={"Lengths": st.column_config.NumberColumn(
+                        format="%+.2f")})
+                meta = [f"{r.used_runs} of {len(r.runner.runs)} runs usable",
+                        f"evidence {r.evidence:.2f}"]
+                if race.code == GREYHOUND:
+                    meta.append(f"box {r.tab} (effective {r.eff_box}, "
+                                f"{r.gap_inside} vacant inside)")
+                if race.code == THOROUGHBRED:
+                    meta.append(f"{r.runner.weight}kg, barrier {r.runner.barrier}")
+                    meta.append(f"jockey {r.runner.jockey}")
+                if race.code == HARNESS:
+                    meta.append(f"**{r.runner.dq_count} non-finishes** in "
+                                f"{len(r.runner.runs)}")
+                    meta.append(f"driver {r.runner.driver}")
+                meta.append(f"trainer {r.runner.trainer}")
+                st.caption(" · ".join(meta))
             with b:
                 st.markdown("**Parsed run history**")
-                runs = pd.DataFrame([{
-                    "Fin": (f"{run.pos} of {run.field_size}"
-                            if run.field_size else f"{run.pos} of ?"),
-                    "Margin": run.margin,
-                    "Date": run.run_date,
-                    "Days": run.days_ago,
-                    "Trk": run.track,
-                    "Dist": run.dist_m,
-                    "Surf": run.surface,
-                    "Box": run.box,
-                    "SP": run.sp,
-                    "Sec": run.sectional,
-                    "Kind": run.track_kind,
-                } for run in r.runner.runs])
-                st.dataframe(runs, hide_index=True, column_config={
-                    "Margin": st.column_config.NumberColumn(
-                        "Margin", format="%.1fL",
-                        help="Negative = won by that margin"),
-                    "SP": st.column_config.NumberColumn(format="$%.2f")})
-                rec = {k: f"{v[0]}: {v[1]}-{v[2]}-{v[3]}"
-                       for k, v in r.runner.records.items()}
-                st.caption(" · ".join(f"**{k}** {v}" for k, v in rec.items()))
+                st.dataframe(runs_frame(r, race.code), hide_index=True,
+                             column_config={
+                                 "Margin": st.column_config.NumberColumn(
+                                     "Margin", format="%.1fL",
+                                     help="In lengths. Negative = won by that "
+                                          "margin. Blank = no result."),
+                                 "SP": st.column_config.NumberColumn(format="$%.2f")})
+                st.caption(" · ".join(
+                    f"**{k}** {v[0]}: {v[1]}-{v[2]}-{v[3]}"
+                    for k, v in r.runner.records.items()))
 
 # --- diagnostics --------------------------------------------------------------
 
 with tab_diag:
     if run_sens:
         with st.spinner("Re-rating the race with jittered parameters…"):
-            tally = rating.sensitivity(race, p, draws=400)
+            tally = rating.sensitivity(race, p, draws=300)
         with st.container(border=True):
-            st.markdown("**How often each runner rates top, over 400 random "
+            st.markdown("**How often each runner rates top, over 300 random "
                         "parameter draws**")
-            sdf = pd.DataFrame([{"Runner": k, "Top-rated %": v * 100}
-                                for k, v in tally.items()])
-            st.dataframe(sdf, hide_index=True, column_config={
-                "Top-rated %": st.column_config.ProgressColumn(
+            st.dataframe(
+                pd.DataFrame([{"Runner": k, "Top-rated %": v * 100}
+                              for k, v in tally.items()]),
+                hide_index=True,
+                column_config={"Top-rated %": st.column_config.ProgressColumn(
                     "Top-rated %", format="%.1f%%", min_value=0.0, max_value=100.0)})
             best = max(tally.values()) if tally else 0
             st.caption(
-                "A selection near 100% is a property of the form. One near 50% "
-                "means the constants are choosing the winner, not the data."
+                "A selection near 100% is a property of the form."
                 if best > 0.9 else
-                "This selection is **not** robust to the parameter choice — "
-                "the race is closer than the headline number suggests.")
+                "This selection is **not** robust to the parameter choice — the "
+                "race is closer than the headline number suggests.")
 
     with st.container(border=True):
         st.markdown("**Rating terms across the field (lengths)**")
         keys = list(rated[0].terms)
-        tdf = pd.DataFrame([{"Runner": f"{r.box}. {r.name}",
-                             **{k: r.terms.get(k, 0.0) for k in keys},
-                             "TOTAL": r.rating} for r in rated])
-        st.dataframe(tdf, hide_index=True, column_config={
-            k: st.column_config.NumberColumn(format="%+.2f")
-            for k in keys + ["TOTAL"]})
+        st.dataframe(
+            pd.DataFrame([{"Runner": f"{r.tab}. {r.name}",
+                           **{k: r.terms.get(k, 0.0) for k in keys},
+                           "TOTAL": r.rating} for r in rated]),
+            hide_index=True,
+            column_config={k: st.column_config.NumberColumn(format="%+.2f")
+                           for k in keys + ["TOTAL"]})
+
+    if race.code == HARNESS:
+        with st.container(border=True):
+            st.markdown("**Non-finishes (DQG / disqualified)**")
+            st.dataframe(pd.DataFrame([{
+                "No.": r.tab, "Runner": r.name,
+                "Non-finishes": r.runner.dq_count,
+                "Runs shown": len(r.runner.runs),
+                "Rate %": r.runner.dq_rate * 100,
+                "Penalty (L)": r.terms.get("reliability", 0.0),
+            } for r in rated]).sort_values("Rate %", ascending=False),
+                hide_index=True, column_config={
+                    "Rate %": st.column_config.NumberColumn(format="%.0f%%"),
+                    "Penalty (L)": st.column_config.NumberColumn(format="%+.2f")})
+            st.caption("A break in gait is not a result, so those runs are "
+                       "excluded from the margin average and scored here instead.")
 
     with st.container(border=True):
         st.markdown("**Parse report**")
-        st.write(f"Track code inferred from run tables: "
-                 f"`{race.track_code() or 'unknown'}`")
+        st.write(f"Code: `{race.code}` · track code inferred from the run "
+                 f"tables: `{race.track_code() or 'unknown'}`")
         susp = [(r.name, run) for r in race.field_ for run in r.runs
                 if run.field_size_suspect]
         if susp:
@@ -343,12 +400,10 @@ with tab_diag:
                      f"imputed as {p.impute_field_size}:")
             st.dataframe(pd.DataFrame(
                 [{"Runner": n, "Date": run.run_date, "Trk": run.track,
-                  "Shown": f"{run.pos} of ?"} for n, run in susp]),
-                hide_index=True)
-        if race.warnings:
-            for w in race.warnings:
-                st.write("• " + w)
-        else:
+                  "Shown": f"{run.pos} of ?"} for n, run in susp]), hide_index=True)
+        for w in race.warnings:
+            st.write("• " + w)
+        if not race.warnings and not susp:
             st.write("No parser warnings.")
 
 # --- method -------------------------------------------------------------------
@@ -357,64 +412,64 @@ with tab_method:
     st.markdown("""
 ### What it does
 
-Each runner's last-10 runs are turned into a **weighted average beaten margin**,
-expressed in lengths at today's distance. Each past run is weighted by:
+Each runner's last-10 runs become a **weighted average beaten margin**, in
+lengths at today's distance. Each past run is weighted by **recency**
+(`exp(−days/τ)`), **distance relevance** (`exp(−((d−today)/σ)²)`), **track shape**
+(straight tracks have no first turn, so that form does not transfer to or from a
+circle track) and **surface** — a separate axis, so straight turf form is
+discounted on both counts.
 
-- **recency** — `exp(−days / τ)`
-- **distance relevance** — `exp(−((run distance − today) / σ)²)`, so a 520m
-  failure barely counts in a 400m race
-- **track shape** — straight-track form is discounted for a circle race and vice
-  versa. A straight track has no first turn, so railing ability and box speed do
-  not transfer in either direction.
-- **surface** — turf form is discounted in an all-weather race, and vice versa.
-  This is a *separate* axis from track shape: straight turf form gets both.
+That margin plus `class`, `conversion`, `distance`, `course`, `surface`,
+`going` and `layoff` gives a rating in lengths. A softmax turns ratings into
+race-conditional win probabilities, blended in log space with the market after
+a power de-vig.
 
-That margin, plus these terms, gives a rating in lengths:
+### What changes per code
 
-| Term | What it is |
-|---|---|
-| `form` | weighted average beaten margin, negated |
-| `class` | career strike rate against a 12.5% field baseline |
-| `conversion` | how often this dog turns a top-3 finish into a win |
-| `distance` | strike rate at today's trip vs its own career rate |
-| `course` | strike rate at today's track vs its own career rate |
-| `surface` | strike rate on today's surface vs its own career rate |
-| `early speed` | own sectionals at this track **and** distance |
-| `layoff` | penalty for a spell over 60 days |
-| `box` | effective position from the rail, counting vacant boxes |
+| | Greyhound | Thoroughbred | Harness |
+|---|---|---|---|
+| Margins | lengths | lengths | **metres**, ÷2.5 |
+| Extra terms | early speed, box | **weight**, barrier | **reliability (DQG)** |
+| Past-run adjustment | — | weight carried vs today | distance handicap credited |
+| Typical spread | 2.4L | 4.0L | 9.0L |
 
-Ratings go through a softmax to give race-conditional win probabilities, which
-are blended in log space with the market after removing the overround with a
-power de-vig.
+**Thoroughbred.** A handicapper's own margins are not comparable across its runs
+until they are put on the same weight. A run under 56kg when today's mark is
+61.5kg flatters it by about 3.8 lengths at the default scale.
+
+**Harness.** A `DQG` — broke gait, disqualified — is **not a result**, and R&S
+print a sentinel margin of `99m` against it. Those runs are dropped from the
+margin average and the *rate* is scored separately, because on a French trot
+page it is the most predictive thing there: a horse that breaks in seven of ten
+starts is not a 4-length problem, it is an unreliable one. Runs off a `+25m`
+distance handicap get credit for the extra ground.
 
 ### Things it gets wrong
 
 **There is no opposition-strength adjustment.** Margins are scaled for distance
-and field size but not for the quality of the dogs beaten, so a runner beaten 1L
-in a weak race outrates one beaten 5L in a strong one. Across the races this was
-built on, the runner with the best weighted margin finished 3rd and 4th. `form`
-is the weakest column in the model and everything else is built on it. The real
-fix is fitting abilities jointly across many races, not another hand-tuned term.
+and field size but not for the quality of the field beaten, so a runner beaten
+1L in a weak race outrates one beaten 5L in a strong one. Across the greyhound
+races this was built on, the runner with the best weighted margin finished 3rd
+and 4th. `form` is the weakest column and everything else sits on it. The real
+fix is fitting abilities jointly across many races.
 
-**Small samples used to swing it hard.** The distance term once ran on a prior
-worth 7 starts, which let a two-start record move a dog 1.9 lengths; the two
-runners it penalised hardest in a live race finished first and second. The prior
-now defaults to 15 starts and is on a slider — turn it down and watch the
-ratings get louder and worse.
-
-**The record is three races.** Use `backtest.py` to score any change against
-them. Three races cannot tell you whether the model beats the market; they only
-tell you whether you have broken something that used to work.
+**The record is three greyhound races.** `python backtest.py` scores them. There
+is **no scored result yet for thoroughbred or harness** — those ratings are
+untested, and the sensible way to read them today is as a structured summary of
+the form, not as a proven edge.
 
 ### Sanity notes
 
-- The dog's **name comes before** the tag block on this page and the **trainer
-  after the box**. A reader that grabs the last capitalised line reports the
-  trainer as the runner.
-- R&S emit impossible finishing lines such as `6 of 4`. The field size is
-  discarded and imputed for those runs; the Diagnostics tab lists them.
-- Sectionals are measured to a different marker at each track and distance, so
-  only runs at **today's track and distance** are compared.
+- The runner's **name precedes** the tag block; the **trainer comes last**. A
+  reader that grabs the last capitalised line reports the trainer (greyhound),
+  the **weight** (thoroughbred) or the **driver** (harness) instead.
+- R&S ship different run-table column sets **on the same page** — at Cabourg
+  some runners carry a `Draw` column and some do not — so every table is read
+  through its own header row.
+- R&S emit impossible finishing lines such as `6 of 4`; those field sizes are
+  discarded and imputed, and Diagnostics lists them.
+- Greyhound sectionals are measured to a different marker at each track and
+  distance, so only runs at **today's track and distance** are compared.
 """)
     st.caption("For free and confidential support call 1800 858 858 or visit "
                "gamblinghelponline.org.au")
