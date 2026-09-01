@@ -435,7 +435,7 @@ def test_stale_module_guard_fires_before_any_helper_import():
     redacted Cloud traceback that follows says nothing useful.  Verified by
     source order, because the failure only reproduces against a cached module."""
     src = io.open(os.path.join(HERE, "app.py"), encoding="utf-8").read()
-    guard = src.index("_REQUIRED = {")
+    guard = src.index("_REQUIRED: dict[str, set[str]] = {}")
     stop = src.index("st.stop()", guard)
     for line in src[:guard].splitlines():
         assert not line.startswith(("import rating", "import rs_parser",

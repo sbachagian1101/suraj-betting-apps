@@ -7,6 +7,7 @@ import glob
 import importlib
 import io
 import os
+import re
 
 import altair as alt
 import pandas as pd
@@ -23,21 +24,24 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # raises ImportError on the import line itself and the redacted Cloud traceback
 # that follows says nothing useful.  Importing defensively here is the only way
 # the guard can turn that into one actionable sentence.
-_REQUIRED = {
-    "rs_parser": ["parse", "Race", "Runner", "Run", "GREYHOUND", "THOROUGHBRED",
-                  "HARNESS", "STRAIGHT_TRACKS", "METRES_PER_LENGTH",
-                  "SENTINEL_METRES"],
-    "rating": ["rate", "Params", "quinellas", "sensitivity", "Rated",
-               "defaults_for", "CODE_DEFAULTS", "replace"],
-}
+# The required names are DERIVED from this file's own source, not hand-listed.
+# A hand-maintained list drifts: `rating.book_percentage` was added and the list
+# was not updated, so the guard passed and Cloud served the redacted
+# AttributeError it exists to prevent.
+_SRC = io.open(__file__, encoding="utf-8").read()
+_REQUIRED: dict[str, set[str]] = {}
+for _mod, _attr in re.findall(r"(rating|rs_parser)\.([A-Za-z_][A-Za-z0-9_]*)", _SRC):
+    _REQUIRED.setdefault(_mod, set()).add(_attr)
+
 _missing: list[str] = []
-for _mod, _names in _REQUIRED.items():
+for _mod in ("rs_parser", "rating"):
     try:
         _m = importlib.import_module(_mod)
     except Exception as _e:                       # stale module -> ImportError
         _missing.append(f"{_mod} (import failed: {type(_e).__name__}: {_e})")
         continue
-    _missing += [f"{_mod}.{n}" for n in _names if not hasattr(_m, n)]
+    _missing += [f"{_mod}.{n}" for n in sorted(_REQUIRED.get(_mod, ()))
+                 if not hasattr(_m, n)]
 if _missing:
     st.error(
         "**This deployment is running stale code.** " + " · ".join(_missing)
