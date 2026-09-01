@@ -291,16 +291,38 @@ with tab_pred:
         with st.container(border=True):
             st.markdown("**Value**")
             overlays = [r for r in rated if r.ev is not None and r.ev > 0]
-            if overlays:
-                for r in overlays:
+            # An overlay where the MODEL rates a runner 5x shorter than the
+            # market is far more likely to be the model being wrong. Measure the
+            # model's own disagreement, not the blend's: p_final is already 62%
+            # market, which compresses the ratio to ~3x and hides the outliers.
+            EXTREME = 5.0
+            sane = [r for r in overlays
+                    if r.p_market and r.p_model < EXTREME * r.p_market]
+            wild = [r for r in overlays if r not in sane]
+            if sane:
+                for r in sorted(sane, key=lambda z: -z.ev):
                     st.write(f"**{r.tab}. {r.name}** — {money(r.odds)} against a "
-                             f"fair {money(r.fair)} · **{r.ev*100:+.1f}% EV**")
-                st.caption("An overlay is the model disagreeing with the market. "
-                           "On this model's short record its value picks have not "
-                           "won — treat them as a hypothesis, not a tip.")
+                             f"fair {money(r.fair)} · **{r.ev*100:+.1f}% EV** "
+                             f"· {r.used_runs} usable runs")
             else:
-                st.write("No runner is priced above its modelled chance. "
-                         "On this race the model has no bet.")
+                st.write("No runner is priced above its modelled chance within a "
+                         "sane margin. On this race the model has no bet.")
+            if wild:
+                st.markdown("**Extreme disagreements — treat as model error**")
+                for r in sorted(wild, key=lambda z: -z.ev):
+                    st.write(f"{r.tab}. {r.name} — {money(r.odds)}, model says "
+                             f"{money(r.fair)} (the form model rates it "
+                             f"{r.p_model/r.p_market:.0f}x shorter than the "
+                             f"market) · {r.used_runs} usable runs")
+                st.caption(
+                    "The model rating a runner several times shorter than the "
+                    "market usually means it has over-credited a couple of races "
+                    "at a flattering trip, not that it has found something. It "
+                    "has **no opposition-strength adjustment**, so beating a "
+                    "weak field looks the same as beating a strong one.")
+            st.caption("An overlay is the model disagreeing with the market. "
+                       "On this model's short record its value picks have not "
+                       "won — treat them as a hypothesis, not a tip.")
         with st.container(border=True):
             st.markdown("**Most likely first two (either order)**")
             for label, prob in rating.quinellas(rated):

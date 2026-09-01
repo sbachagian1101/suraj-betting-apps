@@ -581,3 +581,24 @@ def test_the_same_form_against_two_markets():
         assert e[tab].p_model == pytest.approx(l[tab].p_model, abs=0.05), tab
     assert l[13].p_final > e[13].p_final      # favourite firmed
     assert l[11].p_final < e[11].p_final      # outsider drifted
+
+
+def test_extreme_disagreements_are_separated_from_real_overlays():
+    """A '+147% EV' on a 101/1 shot is not a tip. The UI splits overlays at 5x
+    the market price so a genuine 7% edge is not listed beside a model error."""
+    src = io.open(os.path.join(HERE, "app.py"), encoding="utf-8").read()
+    assert "EXTREME = 5.0" in src
+    assert "Extreme disagreements" in src
+    rated, _ = rating.rate(load(CABO_LATE))
+    wild = [r for r in rated
+            if r.ev and r.ev > 0 and r.p_model >= 5.0 * r.p_market]
+    sane = [r for r in rated
+            if r.ev and r.ev > 0 and r.p_model < 5.0 * r.p_market]
+    assert wild and sane, "this page has both kinds"
+    # the split is on how far the model departs from the price, not on the price
+    # itself: MOLITOR FLIGNY is 81/1 but the model only rates it 1.3x shorter,
+    # so it is a normal (if unappealing) overlay, while MAJOR DU MONT at 101/1
+    # is rated ~19x shorter and is a model error.
+    assert {r.tab for r in wild} == {10, 11}
+    assert all(r.p_model < 5.0 * r.p_market for r in sane)
+    assert max(r.p_model / r.p_market for r in wild) > 10
