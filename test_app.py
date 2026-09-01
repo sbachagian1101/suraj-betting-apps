@@ -418,3 +418,19 @@ def test_streamlit_app_renders_every_code(fx):
     at.run()
     assert not at.exception, at.exception
     assert any(m.value for m in at.metric)
+
+
+def test_stale_module_guard_fires_before_any_helper_import():
+    """The guard must run BEFORE `import rating` / `import rs_parser`.  A stale
+    Streamlit Cloud module raises ImportError on the import line itself, and the
+    redacted Cloud traceback that follows says nothing useful.  Verified by
+    source order, because the failure only reproduces against a cached module."""
+    src = io.open(os.path.join(HERE, "app.py"), encoding="utf-8").read()
+    guard = src.index("_REQUIRED = {")
+    stop = src.index("st.stop()", guard)
+    for line in src[:guard].splitlines():
+        assert not line.startswith(("import rating", "import rs_parser",
+                                    "from rs_parser", "from rating")), line
+    assert src.index("import rating", stop) > stop
+    assert "except Exception" in src[guard:stop], \
+        "the guard must survive a module that fails to import at all"

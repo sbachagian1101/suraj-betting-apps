@@ -12,34 +12,46 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-import rating
-import rs_parser
-from rs_parser import GREYHOUND, HARNESS, THOROUGHBRED
-
 st.set_page_config(page_title="RaceForm", page_icon="🏇", layout="wide")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 # --- stale-deployment guard ---------------------------------------------------
 # Streamlit Cloud has repeatedly served a NEW app.py against a CACHED helper
-# module after a push that added a module-level name, producing an opaque
-# AttributeError halfway down the page.  Turn that into one actionable line.
+# module after a push that added module-level names.  This guard MUST run before
+# any `from rs_parser import ...` / `import rating`, because a stale module
+# raises ImportError on the import line itself and the redacted Cloud traceback
+# that follows says nothing useful.  Importing defensively here is the only way
+# the guard can turn that into one actionable sentence.
 _REQUIRED = {
     "rs_parser": ["parse", "Race", "Runner", "Run", "GREYHOUND", "THOROUGHBRED",
-                  "HARNESS", "STRAIGHT_TRACKS", "METRES_PER_LENGTH"],
+                  "HARNESS", "STRAIGHT_TRACKS", "METRES_PER_LENGTH",
+                  "SENTINEL_METRES"],
     "rating": ["rate", "Params", "quinellas", "sensitivity", "Rated",
-               "defaults_for", "CODE_DEFAULTS"],
+               "defaults_for", "CODE_DEFAULTS", "replace"],
 }
-_missing = []
+_missing: list[str] = []
 for _mod, _names in _REQUIRED.items():
-    _m = importlib.import_module(_mod)
+    try:
+        _m = importlib.import_module(_mod)
+    except Exception as _e:                       # stale module -> ImportError
+        _missing.append(f"{_mod} (import failed: {type(_e).__name__}: {_e})")
+        continue
     _missing += [f"{_mod}.{n}" for n in _names if not hasattr(_m, n)]
 if _missing:
     st.error(
-        "This deployment is running stale code: " + ", ".join(_missing)
-        + " is missing. Open **Manage app → ⋮ → Reboot app** to force a clean "
+        "**This deployment is running stale code.** " + " · ".join(_missing)
+        + "\n\nStreamlit Cloud has served the new `app.py` against a cached "
+          "helper module. Open **Manage app → ⋮ → Reboot app** to force a clean "
           "rebuild. The pushed source is fine.")
     st.stop()
+
+import rating          # noqa: E402  (must follow the guard)
+import rs_parser       # noqa: E402
+
+GREYHOUND = rs_parser.GREYHOUND
+THOROUGHBRED = rs_parser.THOROUGHBRED
+HARNESS = rs_parser.HARNESS
 
 CODE_LABEL = {GREYHOUND: "🐕 Greyhound", THOROUGHBRED: "🏇 Thoroughbred",
               HARNESS: "🛞 Harness"}
