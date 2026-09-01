@@ -85,12 +85,64 @@ _RE_RECORD = re.compile(
     r"^(" + "|".join(re.escape(x) for x in _RECORD_LABELS) + r")(\d+):\s*(\d+)\s+(\d+)\s+(\d+)\s*$")
 _RE_WP = re.compile(r"^W%\s*-\s*P%(\d+)%\s*-\s*(\d+)%\s*$")
 _RE_BREED = re.compile(r"^(\d+)yo\s+([A-Z/]+)\s+(Gelding|Horse|Mare|Filly|Colt|B|D)\b", re.I)
-_RE_DISTLINE = re.compile(
-    # "340m ALL WEATHER GOOD", "1600m TURF GOOD", "2750m SAND STANDARD".
-    # The going is whatever the LAST word is - do NOT whitelist it. A
-    # hardcoded list missed SAND STANDARD, which failed the whole line, left
-    # dist_m None, and silently collapsed the model to uniform.
-    r"^(\d{3,4})m\s+([A-Z][A-Z \-]*?)\s+([A-Z]+)\s*$", re.I)
+#: surfaces R&S print, longest first so "ALL WEATHER" wins over "AW"
+SURFACE_WORDS = ("ALL WEATHER", "POLYTRACK", "FIBRESAND", "SYNTHETIC",
+                 "TAPETA", "TURF", "SAND", "DIRT", "AW")
+
+_RE_DIST_METRIC = re.compile(r"^(\d{3,4})\s*m$", re.I)
+_RE_DIST_IMPERIAL = re.compile(
+    r"^(?:(\d+)m)?(?:(\d+)f)?(?:(\d+)y)?$", re.I)
+_RE_GOING_RATING = re.compile(r"^([A-Z]+)(?:\s+(\d{1,2}))?$", re.I)
+
+METRES_PER_MILE, METRES_PER_FURLONG, METRES_PER_YARD = 1609.344, 201.168, 0.9144
+
+
+def parse_distance(token: str) -> int | None:
+    """`1200m` -> 1200.  `1m1f207y` -> 2000.  `6f` -> 1207.  `2m4f` -> 4023.
+
+    Metric first: a bare `1200m` is twelve hundred METRES, not 1200 miles, and
+    the imperial pattern would happily match it.
+    """
+    t = (token or "").strip()
+    m = _RE_DIST_METRIC.match(t)
+    if m:
+        return int(m.group(1))
+    m = _RE_DIST_IMPERIAL.match(t)
+    if not m or not any(m.groups()):
+        return None
+    miles, furlongs, yards = (int(g) if g else 0 for g in m.groups())
+    if miles > 5 or furlongs > 7:
+        return None
+    total = (miles * METRES_PER_MILE + furlongs * METRES_PER_FURLONG
+             + yards * METRES_PER_YARD)
+    return int(round(total)) if 400 <= total <= 7000 else None
+
+
+def parse_dist_line(line: str) -> tuple[int, str, str, int | None] | None:
+    """`1200m TURF SOFT 5` -> (1200, "TURF", "SOFT", 5).
+
+    Parsed rather than pattern-matched, because this one line has now broken the
+    app three separate ways: a whitelisted going missed `SAND STANDARD`, a
+    single trailing word missed the Australian `SOFT 5`, and a metres-only
+    pattern missed the British `1m1f207y`.  Each failure killed the WHOLE line,
+    left dist_m None, and silently collapsed the model to no evidence at all.
+    """
+    parts = (line or "").strip().split()
+    if len(parts) < 3:
+        return None
+    dist = parse_distance(parts[0])
+    if dist is None:
+        return None
+    rest = " ".join(parts[1:]).upper()
+    for surf in SURFACE_WORDS:
+        if rest.startswith(surf + " "):
+            going_txt = rest[len(surf):].strip()
+            g = _RE_GOING_RATING.match(going_txt)
+            if not g:
+                return None
+            return dist, surf, g.group(1).upper(), (
+                int(g.group(2)) if g.group(2) else None)
+    return None
 _RE_CODE = re.compile(r"Form Guide(Greyhound|Thoroughbred|Harness)", re.I)
 _RE_TITLE = re.compile(r"^(.+?)\s+Form Guide\s*\(Race\s*(\d+)\)")
 _RE_BREADCRUMB = re.compile(r"RacesRace\s*(\d+)")
@@ -243,6 +295,7 @@ class Race:
     dist_m: int | None = None
     surface: str = ""
     going: str = ""
+    going_rating: int | None = None   # AU numbered going: SOFT 5, HEAVY 10
     grade: str = ""
     prize: str = ""
     runners: list[Runner] = field(default_factory=list)
@@ -408,7 +461,10 @@ def _parse_run_row(cells: list[str], cmap: dict[str, int],
         if cell(key).isdigit():
             run.box = int(cell(key))
             break
-    run.weight = _f(cell("wt")) if cell("wt") else None
+    # British pages print both scales: "9-0 | 57.0" is 9st 0lb AND 57.0kg.
+    # Take the kilograms; the model works in kg throughout.
+    wt_cell = cell("wt")
+    run.weight = _f(wt_cell.split("|")[-1].strip()) if wt_cell else None
     run.jockey = re.sub(r"\s*\([^)]*\)\s*$", "", cell("jockey")).strip()
 
     hm = _RE_HANDICAP.match(cell("draw"))
@@ -419,7 +475,9 @@ def _parse_run_row(cells: list[str], cmap: dict[str, int],
     if pm:
         run.sp = _f(pm.group(1))
     run.sectional = _f(cell("sec")) if cell("sec") else None
-    run.beat_or_beaten_by = re.sub(r"\s*\([\d.]+\)\s*$", "", cell("winner")).strip()
+    # "SANSANETTI (9-9 | 61.0)" / "HALF HALF (56.0)" - drop the trailing weight
+    run.beat_or_beaten_by = re.sub(r"\s*\([\d.\-\s|]+\)\s*$", "",
+                                   cell("winner")).strip()
     return run
 
 
@@ -570,12 +628,10 @@ def _parse_header(lines: list[str], race: Race) -> None:
                 race.race_date = date(int(d.group(4)), MONTHS[d.group(3)[:3].title()],
                                       int(d.group(2)))
         if race.dist_m is None:
-            dl = _RE_DISTLINE.match(s)
+            dl = parse_dist_line(s)
             if dl:
-                race.dist_m = int(dl.group(1))
-                surf = dl.group(2).strip().upper()
+                race.dist_m, surf, race.going, race.going_rating = dl
                 race.surface = "AW" if "WEATHER" in surf else surf
-                race.going = dl.group(3).upper()
         if not race.grade:
             ty = _RE_TYPE.search(s)
             if ty:

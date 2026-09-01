@@ -29,8 +29,8 @@ streamlit run app.py
 | `rating.py` | The rating: weighted margins → softmax → market blend |
 | `app.py` | Streamlit UI |
 | `backtest.py` | Scores the rating against races whose results we know |
-| `test_app.py` | 89 regression tests over six real page captures |
-| `fixtures/` | Bulli, Q Lakeside, Horsham (greyhound), Deauville (thoroughbred), Cabourg early + late market (harness) |
+| `test_app.py` | 111 regression tests over eight real page captures |
+| `fixtures/` | Bulli, Q Lakeside, Horsham (greyhound); Deauville, Scone, Brighton (thoroughbred); Cabourg early + late market (harness) |
 
 ## The model
 
@@ -136,6 +136,36 @@ Prompted by a live Cabourg page showing **"+88% EV" on a 101/1 shot**:
    the market. In France prizemoney *is* the ladder (CL1 ≈€88k > CL2 ≈€51k >
    CL3 ≈€29k, each band tight to 1.3×; trot D > E > F > G > H), so it is kept
    for thoroughbred and harness and set to zero for greyhound.
+
+## The distance line has broken this app three times
+
+It is now **parsed**, not pattern-matched, because a single regex kept missing a
+new format and each miss killed the *whole* line — leaving `dist_m` as `None`,
+pushing every past run outside the distance kernel, and silently collapsing the
+model to no evidence at all. Nothing looked broken; the app just quietly stopped
+having an opinion.
+
+| Format | Where | What it broke |
+|---|---|---|
+| `2750m SAND STANDARD` | French harness | going was whitelisted, `STANDARD` missing |
+| `1200m TURF SOFT 5` | Australian | the numbered going rating |
+| `1m1f207y TURF GOOD` | British | imperial distance (= 2000m) |
+
+`parse_dist_line()` splits the line, parses the distance metric-first (a bare
+`1200m` is metres, not 1200 miles), matches a known surface, and takes whatever
+remains as the going plus an optional rating.
+
+## An incoherent book suppresses EV
+
+Brighton's R&S best-odds prices summed to **36%**. A real market sits a little
+over 100%. Normalising a 36% book scales every probability by 2.7×, so
+`EV = p × odds − 1` handed **every runner** the same invented ~+175% edge — the
+app listed all ten as value.
+
+The rule now: **normalised probabilities are for ranking; EV requires the raw
+prices to form a coherent book.** Outside 102–180% the ranking is still shown,
+the book percentage is displayed next to the market favourite, and no EV or
+value is quoted at all.
 
 ## Parser notes
 

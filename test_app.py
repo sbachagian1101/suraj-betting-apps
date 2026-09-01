@@ -447,25 +447,45 @@ def test_stale_module_guard_fires_before_any_helper_import():
 
 # --- regressions from the live Cabourg page (2026-09-01) ---------------------
 
-@pytest.mark.parametrize("line,dist,surface,going", [
-    ("2750m SAND STANDARD", 2750, "SAND", "STANDARD"),
-    ("2750m SAND GOOD", 2750, "SAND", "GOOD"),
-    ("1600m TURF GOOD", 1600, "TURF", "GOOD"),
-    ("340m ALL WEATHER GOOD", 340, "ALL WEATHER", "GOOD"),
-    ("520m ALL WEATHER SLOW", 520, "ALL WEATHER", "SLOW"),
-    ("1600m POLYTRACK STANDARD", 1600, "POLYTRACK", "STANDARD"),
+@pytest.mark.parametrize("line,expected", [
+    # metric, with and without an Australian numbered going
+    ("2750m SAND STANDARD",     (2750, "SAND", "STANDARD", None)),
+    ("2750m SAND GOOD",         (2750, "SAND", "GOOD", None)),
+    ("1600m TURF GOOD",         (1600, "TURF", "GOOD", None)),
+    ("340m ALL WEATHER GOOD",   (340, "ALL WEATHER", "GOOD", None)),
+    ("1200m TURF SOFT 5",       (1200, "TURF", "SOFT", 5)),
+    ("1400m TURF HEAVY 10",     (1400, "TURF", "HEAVY", 10)),
+    ("1200m TURF GOOD 3",       (1200, "TURF", "GOOD", 3)),
+    ("1600m POLYTRACK STANDARD", (1600, "POLYTRACK", "STANDARD", None)),
+    # British imperial
+    ("1m1f207y TURF GOOD",      (2000, "TURF", "GOOD", None)),
+    ("6f TURF GOOD",            (1207, "TURF", "GOOD", None)),
+    ("2m4f TURF SOFT",          (4023, "TURF", "SOFT", None)),
+    ("1m TURF GOOD",            (1609, "TURF", "GOOD", None)),
 ])
-def test_going_is_not_whitelisted(line, dist, surface, going):
-    """A hardcoded going list missed SAND STANDARD, which failed the whole
-    distance line, left dist_m None, and silently collapsed the model."""
-    m = rs_parser._RE_DISTLINE.match(line)
-    assert m, line
-    assert (int(m.group(1)), m.group(2), m.group(3)) == (dist, surface, going)
+def test_the_distance_line_is_parsed_not_pattern_matched(line, expected):
+    """This one line has broken the app three separate ways: a whitelisted
+    going missed `SAND STANDARD`, a single trailing word missed the Australian
+    `SOFT 5`, and a metres-only pattern missed the British `1m1f207y`. Each
+    failure killed the WHOLE line, left dist_m None, and silently collapsed the
+    model to no evidence at all."""
+    assert rs_parser.parse_dist_line(line) == expected
 
 
-def test_a_line_that_is_not_a_distance_line_is_not_matched():
-    for junk in ["Computer Selection Panels", "Full Fields", "R&S Tips"]:
-        assert not rs_parser._RE_DISTLINE.match(junk)
+@pytest.mark.parametrize("junk", [
+    "Computer Selection Panels", "Full Fields", "R&S Tips", "Odds Comparison",
+    "1200m", "TURF GOOD", "", "Race 7",
+])
+def test_a_line_that_is_not_a_distance_line_is_not_matched(junk):
+    assert rs_parser.parse_dist_line(junk) is None
+
+
+def test_a_bare_metric_distance_is_not_read_as_miles():
+    assert rs_parser.parse_distance("1200m") == 1200
+    assert rs_parser.parse_distance("1m") == 1609
+    assert rs_parser.parse_distance("6f") == 1207
+    assert rs_parser.parse_distance("1m1f207y") == 2000
+    assert rs_parser.parse_distance("nonsense") is None
 
 
 def _strip_all_form(race):
@@ -602,3 +622,82 @@ def test_extreme_disagreements_are_separated_from_real_overlays():
     assert {r.tab for r in wild} == {10, 11}
     assert all(r.p_model < 5.0 * r.p_market for r in sane)
     assert max(r.p_model / r.p_market for r in wild) > 10
+
+
+# --- Scone / Brighton regressions (2026-09-01) -------------------------------
+
+SCONE = "scone_r7_2026-09-01.txt"
+BRIGHTON = "brighton_r3_2026-09-01.txt"
+
+
+def test_australian_numbered_going_parses_end_to_end():
+    """`1200m TURF SOFT 5`. The trailing rating broke the line, so dist_m was
+    None, every run fell outside the distance kernel and the model went blind -
+    Model % equalled Market % for all ten runners."""
+    r = load(SCONE)
+    assert (r.dist_m, r.surface, r.going, r.going_rating) == (1200, "TURF", "SOFT", 5)
+    assert r.going_record_label == "Soft"
+    rated, _ = rating.rate(r)
+    # every run on the page is usable (two runners only have seven listed)
+    assert all(x.used_runs == len(x.runner.runs) for x in rated)
+    assert min(x.used_runs for x in rated) >= 7
+    assert any(abs(x.p_model - x.p_market) > 0.03 for x in rated), \
+        "the model must have an opinion of its own"
+
+
+def test_british_imperial_distance_parses_end_to_end():
+    """`1m1f207y` is 1 mile 1 furlong 207 yards = 2000m."""
+    r = load(BRIGHTON)
+    assert (r.dist_m, r.surface, r.going) == (2000, "TURF", "GOOD")
+    rated, _ = rating.rate(r)
+    assert all(x.used_runs > 0 for x in rated)
+
+
+def test_british_dual_weight_column_reads_kilograms():
+    """UK pages print `9-0 | 57.0` - nine stone exactly, AND 57.0kg."""
+    mmw = next(x for x in load(BRIGHTON).field_ if x.tab == 1)
+    assert mmw.weight == 61.0 and mmw.barrier == 8
+    assert mmw.jockey == "TARYN LANGLEY" and mmw.trainer == "DAVID SIMCOCK"
+    first = mmw.runs[0]
+    assert first.weight == 57.0
+    assert first.beat_or_beaten_by == "SANSANETTI"
+
+
+def test_an_incoherent_book_suppresses_every_ev():
+    """Brighton's best-odds prices sum to 36%. Normalising a 36% book scales
+    every probability by 2.7x, so EV = p*odds-1 hands EVERY runner the same
+    invented ~+175% edge. That is what the screenshot showed."""
+    r = load(BRIGHTON)
+    rated, notes = rating.rate(r)
+    book = rating.book_percentage(rated)
+    assert 0.30 < book < 0.45
+    assert all(not x.market_ok for x in rated)
+    assert all(x.ev is None for x in rated)
+    assert any("coherent book" in n for n in notes)
+    # ranking still works - normalised probabilities are fine for ordering
+    assert sum(x.p_final for x in rated) == pytest.approx(1.0)
+
+
+def test_a_normal_book_is_left_alone():
+    for fx in (SCONE, BULLI, HSHM, DEAU, CABO, CABO_LATE):
+        rated, _ = rating.rate(load(fx))
+        book = rating.book_percentage(rated)
+        assert rating.BOOK_MIN <= book <= rating.BOOK_MAX, (fx, book)
+        assert all(x.market_ok for x in rated)
+        assert all(x.ev is not None for x in rated)
+
+
+def test_scone_scratchings_and_field():
+    r = load(SCONE)
+    assert len(r.field_) == 10
+    assert {x.tab for x in r.runners if x.scratched} == {1, 8}
+    hs = next(x for x in r.field_ if x.tab == 5)
+    assert hs.name == "HERMAN SAID" and hs.trainer == "KRIS LEES"
+    assert hs.jockey == "AARON BULLOCK" and hs.weight == 59.0
+
+
+def test_the_ui_surfaces_the_book_percentage_and_explains_a_suppressed_ev():
+    src = io.open(os.path.join(HERE, "app.py"), encoding="utf-8").read()
+    assert 'st.metric("Book"' in src
+    assert "not a coherent book" in src
+    assert "EV is not shown for this race" in src

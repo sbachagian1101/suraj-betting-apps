@@ -227,6 +227,11 @@ with st.container(horizontal=True):
     st.metric("Fair price", f"${top.fair:.2f}",
               delta=(f"{top.ev*100:+.0f}% EV at {fmt_odds(top.odds)}"
                      if top.ev is not None else None), border=True)
+    _book = rating.book_percentage(rated)
+    if _book:
+        st.metric("Book", f"{_book*100:.0f}%",
+                  delta=None if top.market_ok else "not a coherent book",
+                  delta_color="off" if top.market_ok else "inverse", border=True)
     if fav:
         st.metric("Market favourite", f"{fav.tab}. {fav.name}",
                   delta="agrees" if fav is top else "model disagrees",
@@ -304,6 +309,10 @@ with tab_pred:
                     st.write(f"**{r.tab}. {r.name}** — {money(r.odds)} against a "
                              f"fair {money(r.fair)} · **{r.ev*100:+.1f}% EV** "
                              f"· {r.used_runs} usable runs")
+            elif not top.market_ok:
+                st.write("**EV is not shown for this race.** The prices do not "
+                         "form a coherent book, so an edge cannot be computed "
+                         "against them — see the note above the tabs.")
             else:
                 st.write("No runner is priced above its modelled chance within a "
                          "sane margin. On this race the model has no bet.")

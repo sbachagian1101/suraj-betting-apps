@@ -68,6 +68,22 @@ class Params:
     impute_field_size: int = 7
 
 
+#: A real betting market sums to a bit over 100%.  Outside this band the price
+#: set is not a coherent book - R&S "best odds" for a small overseas meeting can
+#: sum to 36% - and EV computed against those raw prices is meaningless: the
+#: normalisation inflates every probability by 1/book, so EVERY runner shows the
+#: same fat edge.  Normalised probabilities are still fine for RANKING.
+BOOK_MIN, BOOK_MAX = 1.02, 1.80
+
+
+def book_percentage(rows: "list[Rated]") -> float | None:
+    """Sum of 1/odds over the field - the bookmaker's take, plus one."""
+    prices = [r.odds for r in rows if r.odds and r.odds > 1.0]
+    if len(prices) < 2:
+        return None
+    return sum(1.0 / o for o in prices)
+
+
 #: sensible starting points per code.  Margins live on very different scales:
 #: a greyhound sprint is decided inside 3 lengths, a French trot can be 70.
 CODE_DEFAULTS: dict[str, dict[str, float]] = {
@@ -108,6 +124,7 @@ class Rated:
     p_final: float = 0.0
     p_top2: float = 0.0
     p_top3: float = 0.0
+    market_ok: bool = True
 
     @property
     def name(self) -> str:
@@ -119,7 +136,11 @@ class Rated:
 
     @property
     def ev(self) -> float | None:
-        return None if not self.odds else self.p_final * self.odds - 1.0
+        """None when the price set is not a coherent book - quoting EV against
+        raw prices that sum to 36% invents an edge for every runner."""
+        if not self.odds or not self.market_ok:
+            return None
+        return self.p_final * self.odds - 1.0
 
 
 _BOX_PROFILE = [0.50, 0.30, 0.10, -0.05, -0.20, -0.30, -0.40, -0.45]
@@ -337,6 +358,19 @@ def rate(race: Race, p: Params | None = None) -> tuple[list[Rated], list[str]]:
     elif thin:
         notes.append("No usable past run for " + ", ".join(thin)
                      + " - those are anchored on the market rather than rated.")
+
+    book = book_percentage(rows)
+    if priced and book is not None and not (BOOK_MIN <= book <= BOOK_MAX):
+        for x in rows:
+            x.market_ok = False
+        notes.append(
+            f"**These prices do not form a coherent book** - they sum to "
+            f"{book*100:.0f}%, where a real market sits between "
+            f"{BOOK_MIN*100:.0f}% and {BOOK_MAX*100:.0f}%. The ranking is still "
+            f"usable, but **no EV or value is shown**: normalising a "
+            f"{book*100:.0f}% book scales every probability by "
+            f"{1/book:.2f}x, which would hand every runner the same invented "
+            f"edge. Check the odds column on the page.")
 
     if priced:
         w = p.market_weight
