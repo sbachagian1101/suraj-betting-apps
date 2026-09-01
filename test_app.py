@@ -292,11 +292,20 @@ def test_margins_are_on_a_sane_scale(fx):
     assert all(-20 < r.avg_margin < 90 for r in rated)
 
 
-def test_greyhound_selections_match_the_written_analysis():
-    """The three races the model was developed on. Bulli and Horsham were
-    correct; Q Lakeside picked the one that ran 3rd. Pinned so a change to the
-    parser or the rating is visible, not silent."""
-    assert rating.rate(load(BULLI))[0][0].name == "LIZZIE LONG LEGS"
+def test_greyhound_selections_are_pinned():
+    """The three greyhound races with known results, pinned so a change to the
+    parser or the rating is visible instead of silent.
+
+    Bulli moved from LIZZIE LONG LEGS (which won) to BLAZING ACE (which did not)
+    on 2026-09-01, and that was a DELIBERATE trade.  The old pick depended on
+    confidence being driven by recency, which charged a long-spelled runner for
+    staleness three times over - in the recency weighting of the average, again
+    in the layoff term, and a third time as low confidence.  Blazing Ace had ten
+    usable runs and a confidence of 0.36 purely because they were old.  Removing
+    that double-count is right on specification grounds even though it cost a
+    winner: the backtest went 2/3 to 1/3 on THREE RACES, which cannot adjudicate
+    a specification.  Do not restore the double-count to get the pick back."""
+    assert rating.rate(load(BULLI))[0][0].name == "BLAZING ACE"
     assert rating.rate(load(QLAKE))[0][0].name == "DAWN SURE CAN"
     assert rating.rate(load(HSHM))[0][0].name == "PAW PALMER"
 
@@ -434,3 +443,141 @@ def test_stale_module_guard_fires_before_any_helper_import():
     assert src.index("import rating", stop) > stop
     assert "except Exception" in src[guard:stop], \
         "the guard must survive a module that fails to import at all"
+
+
+# --- regressions from the live Cabourg page (2026-09-01) ---------------------
+
+@pytest.mark.parametrize("line,dist,surface,going", [
+    ("2750m SAND STANDARD", 2750, "SAND", "STANDARD"),
+    ("2750m SAND GOOD", 2750, "SAND", "GOOD"),
+    ("1600m TURF GOOD", 1600, "TURF", "GOOD"),
+    ("340m ALL WEATHER GOOD", 340, "ALL WEATHER", "GOOD"),
+    ("520m ALL WEATHER SLOW", 520, "ALL WEATHER", "SLOW"),
+    ("1600m POLYTRACK STANDARD", 1600, "POLYTRACK", "STANDARD"),
+])
+def test_going_is_not_whitelisted(line, dist, surface, going):
+    """A hardcoded going list missed SAND STANDARD, which failed the whole
+    distance line, left dist_m None, and silently collapsed the model."""
+    m = rs_parser._RE_DISTLINE.match(line)
+    assert m, line
+    assert (int(m.group(1)), m.group(2), m.group(3)) == (dist, surface, going)
+
+
+def test_a_line_that_is_not_a_distance_line_is_not_matched():
+    for junk in ["Computer Selection Panels", "Full Fields", "R&S Tips"]:
+        assert not rs_parser._RE_DISTLINE.match(junk)
+
+
+def _strip_all_form(race):
+    """Leave every runner with no usable past run, as the going bug did."""
+    for r in race.runners:
+        r.runs = []
+    return race
+
+
+def test_an_uninformative_model_returns_the_market_and_shows_no_value():
+    """THE important one. With no usable form the model must not invent an
+    opinion. Shrinking to the field mean makes it uniform, and a uniform model
+    is not neutral: the log blend reduces to p_market^(1-w), which flattens the
+    market and inflates every longshot. On the live Cabourg page that produced
+    '+88% EV' on a 101/1 shot out of a parse bug."""
+    race = _strip_all_form(load(CABO))
+    rated, notes = rating.rate(race)
+    for r in rated:
+        assert r.p_model == pytest.approx(r.p_market, abs=1e-6)
+        assert r.p_final == pytest.approx(r.p_market, abs=1e-6)
+        assert r.ev == pytest.approx(r.p_market * r.odds - 1.0, abs=1e-6)
+    longest = max(rated, key=lambda r: r.odds)
+    assert longest.ev < 0.10, "a longshot must not show a fat edge from nothing"
+    assert any("usable past run" in n.lower() for n in notes), notes
+
+
+def test_thin_evidence_is_anchored_on_the_market_not_on_the_field_mean():
+    """One evidence-free runner among informed ones is anchored RELATIVE to the
+    field, so it does not land exactly on its market price - but it must sit
+    nearer the market than the field average, which is what stops it inventing
+    an edge."""
+    race = load(CABO)
+    thin = next(r for r in race.field_ if r.tab == 13)   # the favourite: its
+    thin.runs = []                                       # market price is far
+    rated, _ = rating.rate(race)                         # from uniform
+    x = next(r for r in rated if r.tab == 13)
+    uniform = 1.0 / len(rated)
+    assert x.used_runs == 0
+    assert abs(x.p_model - x.p_market) < abs(x.p_model - uniform)
+    assert abs(x.ev) < 0.5, "a runner with no form must not show a fat edge"
+
+
+def test_confidence_is_not_driven_by_recency():
+    """Blazing Ace has ten usable runs 447+ days old. Staleness is paid for by
+    the recency weighting and the layoff term; charging it again as low
+    confidence anchored him on the market instead of on his own form."""
+    rated, _ = rating.rate(load(BULLI))
+    ace = next(r for r in rated if r.tab == 2)
+    assert ace.used_runs >= 8
+    conf = ace.evidence / (ace.evidence + 0.60)
+    assert conf > 0.75, f"stale-but-plentiful form should still be confident ({conf:.2f})"
+    assert ace.terms["layoff"] < -1.5, "the layoff must still be paid for once"
+
+
+def test_class_term_is_off_for_greyhound_and_on_for_the_french_codes():
+    """Prizemoney is a class ladder in France and a venue artifact in Australian
+    greyhound racing: GR 5 alone spans $1.4k-$9.0k across the fixtures."""
+    assert rating.defaults_for(GREYHOUND).k_class_adj == 0.0
+    assert rating.defaults_for(THOROUGHBRED).k_class_adj > 0
+    assert rating.defaults_for(HARNESS).k_class_adj > 0
+
+
+def test_prize_parsing():
+    assert rs_parser.parse_prize("EUR €19.5k") == ("EUR", 19500.0)
+    assert rs_parser.parse_prize("AUD $2,335") == ("AUD", 2335.0)
+    assert rs_parser.parse_prize(" EUR €18,500 ") == ("EUR", 18500.0)
+    assert rs_parser.parse_prize("NZD $30.0k") == ("NZD", 30000.0)
+    assert rs_parser.parse_prize("") is None
+    assert rs_parser.parse_prize("not a price") is None
+
+
+def test_class_adjustment_never_mixes_currencies():
+    """ADOBE RAVE's form is all NZD against an AUD race - a cross-currency ratio
+    would need an exchange rate, so those runs get no class adjustment."""
+    race = load(QLAKE)
+    assert race.prize_value[0] == "AUD"
+    adobe = next(r for r in race.field_ if r.tab == 1)
+    assert all(run.prize_value[0] == "NZD" for run in adobe.runs if run.prize_value)
+    a = rating.rate(race, rating.replace(
+        rating.defaults_for(GREYHOUND), k_class_adj=0.0))[0]
+    b = rating.rate(race, rating.replace(
+        rating.defaults_for(GREYHOUND), k_class_adj=5.0))[0]
+    ma = next(x for x in a if x.tab == 1).avg_margin
+    mb = next(x for x in b if x.tab == 1).avg_margin
+    assert ma == pytest.approx(mb)
+
+
+CABO_LATE = "cabourg_r4_late_2026-09-01.txt"
+
+
+def test_late_market_page_parses_standard_going_end_to_end():
+    """The live Cabourg page later read `2750m SAND STANDARD`. The hardcoded
+    going list failed that line, left dist_m None, and every past run then fell
+    outside the distance kernel - so the model had zero evidence and went
+    uniform without anything obviously breaking."""
+    r = load(CABO_LATE)
+    assert (r.dist_m, r.surface, r.going) == (2750, "SAND", "STANDARD")
+    assert len(r.field_) == 15
+    rated, _ = rating.rate(r)
+    assert all(x.used_runs > 0 for x in rated)
+    assert len({round(x.p_model, 6) for x in rated}) > 5, "model must not be flat"
+
+
+def test_the_same_form_against_two_markets():
+    """Identical run tables, different prices. The form model should barely
+    move; the blend should follow the market."""
+    early, late = rating.rate(load(CABO))[0], rating.rate(load(CABO_LATE))[0]
+    e = {x.tab: x for x in early}
+    l = {x.tab: x for x in late}
+    assert e[13].odds == 3.7 and l[13].odds == 2.75
+    assert e[11].odds == 35.0 and l[11].odds == 101.0
+    for tab in e:
+        assert e[tab].p_model == pytest.approx(l[tab].p_model, abs=0.05), tab
+    assert l[13].p_final > e[13].p_final      # favourite firmed
+    assert l[11].p_final < e[11].p_final      # outsider drifted

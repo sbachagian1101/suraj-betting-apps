@@ -86,7 +86,11 @@ _RE_RECORD = re.compile(
 _RE_WP = re.compile(r"^W%\s*-\s*P%(\d+)%\s*-\s*(\d+)%\s*$")
 _RE_BREED = re.compile(r"^(\d+)yo\s+([A-Z/]+)\s+(Gelding|Horse|Mare|Filly|Colt|B|D)\b", re.I)
 _RE_DISTLINE = re.compile(
-    r"^(\d{3,4})m\s+([A-Z \-]+?)\s+(GOOD|FAST|SLOW|HEAVY|FIRM|SOFT|DEAD|SLOPPY)\s*$", re.I)
+    # "340m ALL WEATHER GOOD", "1600m TURF GOOD", "2750m SAND STANDARD".
+    # The going is whatever the LAST word is - do NOT whitelist it. A
+    # hardcoded list missed SAND STANDARD, which failed the whole line, left
+    # dist_m None, and silently collapsed the model to uniform.
+    r"^(\d{3,4})m\s+([A-Z][A-Z \-]*?)\s+([A-Z]+)\s*$", re.I)
 _RE_CODE = re.compile(r"Form Guide(Greyhound|Thoroughbred|Harness)", re.I)
 _RE_TITLE = re.compile(r"^(.+?)\s+Form Guide\s*\(Race\s*(\d+)\)")
 _RE_BREADCRUMB = re.compile(r"RacesRace\s*(\d+)")
@@ -98,6 +102,26 @@ _RE_MARGIN = re.compile(r"^([\d.]+)\s*(L|m)$", re.I)
 _RE_TYPE = re.compile(r"Type:\s*(.+?)\s+Fastest Time:", re.I)
 _RE_HANDICAP = re.compile(r"^(-?\d+)\s*m$", re.I)
 _RE_PRIZE_HDR = re.compile(r"^\s*(?:AUD|EUR|NZD|GBP|USD)\s*[€$£]?[\d,]+$")
+_RE_PRIZE = re.compile(r"^(AUD|EUR|NZD|GBP|USD)\s*[€$£]?\s*([\d,.]+)\s*(k?)$", re.I)
+
+
+def parse_prize(text: str) -> tuple[str, float] | None:
+    """`EUR €19.5k` -> ("EUR", 19500.0);  `AUD $2,335` -> ("AUD", 2335.0).
+
+    Used as a proxy for the class of a past race.  Currencies are NOT converted:
+    a cross-currency comparison would need a rate, so those runs simply get no
+    class adjustment rather than a wrong one.
+    """
+    m = _RE_PRIZE.match((text or "").strip())
+    if not m:
+        return None
+    try:
+        val = float(m.group(2).replace(",", ""))
+    except ValueError:
+        return None
+    if m.group(3).lower() == "k":
+        val *= 1000.0
+    return m.group(1).upper(), val
 
 
 @dataclass
@@ -142,6 +166,10 @@ class Run:
         if self.is_foreign:
             return "foreign"
         return "circle"
+
+    @property
+    def prize_value(self) -> tuple[str, float] | None:
+        return parse_prize(self.prize)
 
     @property
     def counts_as_form(self) -> bool:
@@ -228,6 +256,10 @@ class Race:
     @property
     def is_straight(self) -> bool:
         return self.track_code().upper() in STRAIGHT_TRACKS
+
+    @property
+    def prize_value(self) -> tuple[str, float] | None:
+        return parse_prize(self.prize)
 
     @property
     def surface_code(self) -> str:

@@ -29,8 +29,8 @@ streamlit run app.py
 | `rating.py` | The rating: weighted margins → softmax → market blend |
 | `app.py` | Streamlit UI |
 | `backtest.py` | Scores the rating against races whose results we know |
-| `test_app.py` | 73 regression tests over five real page captures |
-| `fixtures/` | Bulli, Q Lakeside, Horsham (greyhound), Deauville (thoroughbred), Cabourg (harness) |
+| `test_app.py` | 89 regression tests over six real page captures |
+| `fixtures/` | Bulli, Q Lakeside, Horsham (greyhound), Deauville (thoroughbred), Cabourg early + late market (harness) |
 
 ## The model
 
@@ -87,19 +87,55 @@ fitting abilities jointly across many races — not another hand-tuned term.
 
 ```
 RACE                      PICK               WON                   blend   model  market    unif
-bulli r6                  LIZZIE LONG LEGS   LIZZIE LONG LEGS     1.3363  1.3886  1.4053  2.0794
-qlakeside r7              DAWN SURE CAN      WHO'S IDEA           1.5980  1.5059  1.7120  1.6094
-horsham r8                PAW PALMER         PAW PALMER           1.1133  1.3303  1.0198  1.7918
+bulli r6                  BLAZING ACE        LIZZIE LONG LEGS     1.4182  1.5256  1.4053  2.0794
+qlakeside r7              DAWN SURE CAN      WHO'S IDEA           1.6303  1.5963  1.7120  1.6094
+horsham r8                PAW PALMER         PAW PALMER           1.0876  1.2542  1.0198  1.7918
 
-mean log loss                                                     1.3492  1.4083  1.3790  1.8269
-picks: 2 from 3
+mean log loss                                                     1.3787  1.4587  1.3790  1.8269
+picks: 1 from 3
 ```
 
-Two from three, blend 0.03 nats/race ahead of the market. **Neither number means
-anything at n=3** — at Horsham the market beat the model outright. **There is no
-scored result at all for thoroughbred or harness yet**, so read those ratings as
-a structured summary of the form, not as a proven edge. The backtest exists so a
-change to the parser or the rating shows up as a number instead of a vibe.
+**This was 2 from 3 before 2026-09-01, and the regression was deliberate.** Four
+specification defects were fixed that day (see below); together they cost the
+Bulli pick and took the blend's edge over the market from +0.030 to +0.000
+nats/race. The old Bulli pick depended on confidence being driven by recency,
+which charged a spelled runner for staleness three times over. Keeping a known
+double-count because it won two races out of three is exactly the mistake this
+file exists to prevent — three races cannot adjudicate a specification. The
+numbers are here so the trade is visible rather than quietly forgotten.
+
+**There is still no scored result at all for thoroughbred or harness**, so read
+those ratings as a structured summary of the form, not as a proven edge.
+
+## The four fixes of 2026-09-01
+
+Prompted by a live Cabourg page showing **"+88% EV" on a 101/1 shot**:
+
+1. **The going was whitelisted.** The later page read `2750m SAND STANDARD`;
+   `STANDARD` was not in the hardcoded list, so the whole distance line failed,
+   `dist_m` was `None`, the target distance fell back to 400m, every past run
+   fell outside the distance kernel, and **every runner ended with zero usable
+   evidence** — without anything visibly breaking. The going is now whatever the
+   last word is.
+2. **An uninformative model was manufacturing value.** Shrinking thin evidence
+   toward the *field mean* drives the model to uniform, and a uniform model is
+   not a neutral input: the log-space blend then reduces to `p ∝ p_market^(1−w)`,
+   which flattens the market and inflates every longshot (0.7% → 1.9%, hence the
+   "+88%"). Thin evidence is now anchored on the **market**, so a runner the
+   model knows nothing about simply gets the market's price and shows no edge.
+3. **Confidence was driven by recency**, which charged staleness three times —
+   in the recency weighting of the average, in the layoff term, and again as low
+   confidence. Blazing Ace had ten usable runs and a confidence of 0.36 purely
+   because they were old. Confidence now measures how much *relevant* form
+   exists; recency stays where it belongs.
+4. **Opposition strength**, the model's oldest named weakness, is now partly
+   addressed via prizemoney as a class proxy — **but only in France**. Across
+   the fixtures a single Australian greyhound grade (`GR 5`) spans \$1.4k–\$9.0k,
+   a 6.4× spread, so there prizemoney tracks the venue rather than the class;
+   switching it on took the backtest from 2/3 to 1/3 and put the blend behind
+   the market. In France prizemoney *is* the ladder (CL1 ≈€88k > CL2 ≈€51k >
+   CL3 ≈€29k, each band tight to 1.3×; trot D > E > F > G > H), so it is kept
+   for thoroughbred and harness and set to zero for greyhound.
 
 ## Parser notes
 

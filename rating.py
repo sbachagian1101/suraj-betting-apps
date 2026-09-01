@@ -59,6 +59,7 @@ class Params:
     k_barrier: float = 0.80        # thoroughbred only
     lengths_per_kg: float = 0.70   # thoroughbred weight scale
     k_dq: float = 3.50             # harness reliability term
+    k_class_adj: float = 1.20      # lengths per log-unit of prizemoney ratio
     field_ref: float = 4.5         # "neutral" field size for this code
     k_field: float = 0.45          # lengths of credit per runner above field_ref
     handicap_credit: float = 0.50  # harness: share of a distance handicap credited
@@ -70,11 +71,18 @@ class Params:
 #: sensible starting points per code.  Margins live on very different scales:
 #: a greyhound sprint is decided inside 3 lengths, a French trot can be 70.
 CODE_DEFAULTS: dict[str, dict[str, float]] = {
-    GREYHOUND:    {"spread": 2.40, "sigma_dist": 90.0,
+    # k_class_adj is OFF for greyhound on the evidence: across the fixtures a
+    # single grade (GR 5) spans $1.4k-$9.0k, a 6.4x spread, so Australian
+    # greyhound prizemoney tracks the VENUE, not the class, and using it as a
+    # class proxy injected noise - it took the backtest from 2/3 to 1/3 and put
+    # the blend behind the market.  In France prizemoney IS the class ladder
+    # (CL1 ~E88k > CL2 ~E51k > CL3 ~E29k; trot D > E > F > G > H), each band
+    # tight to <=1.3x, so the term is kept there.
+    GREYHOUND:    {"spread": 2.40, "sigma_dist": 90.0, "k_class_adj": 0.00,
                    "field_ref": 4.5, "k_field": 0.45, "impute_field_size": 7},
-    THOROUGHBRED: {"spread": 4.00, "sigma_dist": 220.0,
+    THOROUGHBRED: {"spread": 4.00, "sigma_dist": 220.0, "k_class_adj": 2.00,
                    "field_ref": 12.0, "k_field": 0.15, "impute_field_size": 14},
-    HARNESS:      {"spread": 9.00, "sigma_dist": 320.0,
+    HARNESS:      {"spread": 9.00, "sigma_dist": 320.0, "k_class_adj": 4.50,
                    "field_ref": 13.0, "k_field": 0.15, "impute_field_size": 13},
 }
 
@@ -134,24 +142,31 @@ def _shrunk_log_ratio(sub_starts: int, sub_wins: int, p0: float, prior: float) -
 def _weighted_margin(r: Runner, race: Race, p: Params) -> tuple[float, float, int]:
     """(weighted average beaten margin in lengths, evidence, runs used)."""
     target = race.dist_m or 400
-    num = den = 0.0
+    today_prize = race.prize_value
+    num = den = rel_total = 0.0
     used = 0
     for run in r.runs:
         if not run.counts_as_form:
             continue          # DQG / no result: excluded, scored separately
-        w = math.exp(-max(run.days_ago, 0) / p.tau_days)
-        w *= math.exp(-((run.dist_m - target) / p.sigma_dist) ** 2)
+        # RELEVANCE: how much this run tells us about today's race at all.
+        rel = math.exp(-((run.dist_m - target) / p.sigma_dist) ** 2)
         kind = run.track_kind
         if kind == "straight" and not race.is_straight:
-            w *= p.w_straight
+            rel *= p.w_straight
         elif kind == "circle" and race.is_straight:
-            w *= p.w_straight
+            rel *= p.w_straight
         elif kind == "foreign":
-            w *= p.w_foreign
+            rel *= p.w_foreign
         if run.surface and race.surface_code and run.surface != race.surface_code:
-            w *= p.w_offsurface
-        if w <= 1e-6:
+            rel *= p.w_offsurface
+        if rel <= 1e-6:
             continue
+        # RECENCY weights the average, but must NOT also drive confidence.
+        # Staleness is already paid for here and again by the layoff term;
+        # charging it a third time as low confidence anchored a long-spelled
+        # runner on the market instead of on its own form.  Blazing Ace had ten
+        # usable runs and a confidence of 0.36 purely because they were old.
+        w = rel * math.exp(-max(run.days_ago, 0) / p.tau_days)
 
         fs = run.field_size or p.impute_field_size
         # Beating more rivals is worth more, but the credit must be on the
@@ -166,12 +181,23 @@ def _weighted_margin(r: Runner, race: Race, p: Params) -> tuple[float, float, in
             # started behind scratch: credit the extra ground it had to make up
             m -= p.handicap_credit * (run.handicap_m / METRES_PER_LENGTH)
 
+        # Opposition strength, via prizemoney as a class proxy.  Without this a
+        # runner beaten 1L in a weak race outrates one beaten 5L in a strong
+        # one - the model's oldest and worst weakness.  Beating a cheaper field
+        # is discounted; running well in a richer one is credited.  Currencies
+        # are never mixed: a cross-currency ratio would need a rate.
+        rp = run.prize_value
+        if today_prize and rp and rp[0] == today_prize[0] and rp[1] > 0:
+            ratio = math.log(today_prize[1] / rp[1])
+            m += p.k_class_adj * max(-1.5, min(1.5, ratio))
+
         num += w * m
         den += w
+        rel_total += rel
         used += 1
-    if den <= 0:
+    if den <= 1e-9:
         return 8.0, 0.0, 0
-    return num / den, den, used
+    return num / den, rel_total, used
 
 
 def _sectional_ref(r: Runner, race: Race) -> tuple[float | None, int]:
@@ -271,24 +297,48 @@ def rate(race: Race, p: Params | None = None) -> tuple[list[Rated], list[str]]:
                           odds=r.odds, avg_margin=avg, evidence=ev, used_runs=used,
                           terms=t, rating=sum(t.values())))
 
-    thin = [x.name for x in rows if x.used_runs == 0]
-    if thin:
-        notes.append("No usable past run for " + ", ".join(thin)
-                     + " - rated at the field average before the record terms.")
-
+    priced = all(x.odds and x.odds > 1.0 for x in rows)
     mean_raw = sum(x.rating for x in rows) / len(rows)
-    for x in rows:
-        conf = x.evidence / (x.evidence + 0.60)
-        x.rating = mean_raw + conf * (x.rating - mean_raw)
 
-    for x, pm in zip(rows, _softmax([x.rating for x in rows], p.spread)):
-        x.p_model = pm
-
-    if all(x.odds and x.odds > 1.0 for x in rows):
+    # Shrink thin evidence toward the MARKET, not toward the field mean.
+    #
+    # Shrinking toward the mean drives an evidence-free model to uniform, and a
+    # uniform model is NOT a neutral input to the blend: with p_model constant,
+    # p_final reduces to p_market^(1-w), which flattens the market and inflates
+    # every longshot.  At Cabourg (where a parse bug had left every runner with
+    # zero usable runs) that manufactured "+88% EV" on a 101/1 shot out of
+    # nothing.  Anchoring on the market instead means a runner the model knows
+    # nothing about simply gets the market's opinion and shows no edge.
+    if priced:
         inv = [(1.0 / x.odds) ** p.devig_power for x in rows]
         z = sum(inv)
         for x, v in zip(rows, inv):
             x.p_market = v / z
+        implied = [p.spread * math.log(x.p_market) for x in rows]
+        mean_imp = sum(implied) / len(implied)
+        anchors = [mean_raw + (i - mean_imp) for i in implied]
+    else:
+        anchors = [mean_raw] * len(rows)
+
+    for x, anchor in zip(rows, anchors):
+        conf = x.evidence / (x.evidence + 0.60)
+        x.rating = anchor + conf * (x.rating - anchor)
+
+    for x, pm in zip(rows, _softmax([x.rating for x in rows], p.spread)):
+        x.p_model = pm
+
+    thin = [x.name for x in rows if x.used_runs == 0]
+    if thin and len(thin) == len(rows):
+        notes.append(
+            "**No runner has a usable past run for this race**, so the form "
+            "model has no independent opinion and is showing the market. Check "
+            "the Diagnostics tab — this usually means the distance or surface "
+            "line did not parse.")
+    elif thin:
+        notes.append("No usable past run for " + ", ".join(thin)
+                     + " - those are anchored on the market rather than rated.")
+
+    if priced:
         w = p.market_weight
         blend = [math.exp(w * math.log(x.p_model) + (1 - w) * math.log(x.p_market))
                  for x in rows]
@@ -385,6 +435,7 @@ def sensitivity(race: Race, base: Params, draws: int = 400, seed: int = 7
             handicap_credit=rng.uniform(0.2, 0.9),
             market_weight=rng.uniform(0.20, 0.60),
             devig_power=rng.uniform(1.0, 1.12),
+            k_class_adj=base.k_class_adj * rng.uniform(0.0, 1.8),
             k_field=base.k_field * rng.uniform(0.5, 1.6),
             impute_field_size=max(4, base.impute_field_size + rng.choice([-1, 0, 1])),
         )
