@@ -146,6 +146,27 @@ def main():
     check("junk does not crash the parser", len(PS.parse("hello\nworld").races)
           == 0)
 
+    # ---- the re-ingest bug: switching race bounced back to Parse/Predict
+    # st.file_uploader returns the SAME file on every rerun, so the ingest
+    # block ran again on every widget change and popped the parsed meeting.
+    data = (SAMPLES / "ripon.csv").read_bytes()
+    fresh1, fp1, text1, name1 = PS.ingest_upload(
+        None, "Tuesday - Ripon Races Worksheets.csv", data)
+    check("a new upload is ingested once", fresh1 and text1 and name1 == "Ripon")
+    fresh2, fp2, _, _ = PS.ingest_upload(
+        fp1, "Tuesday - Ripon Races Worksheets.csv", data)
+    check("the SAME file on a later rerun is not re-ingested",
+          not fresh2 and fp2 == fp1)
+    fresh3, fp3, _, _ = PS.ingest_upload(
+        fp1, "Tuesday - Ripon Races Worksheets.csv",
+        data + bytes([10]) + b"1,X" + bytes([10]))
+    check("an edited file of the same name IS re-ingested",
+          fresh3 and fp3 != fp1)
+    fresh4, _, _, _ = PS.ingest_upload(fp1, "other.csv", data)
+    check("a different filename is re-ingested", fresh4)
+    check("an empty upload does not crash",
+          PS.ingest_upload(None, "x.csv", b"")[0])
+
     # -------------------------------------------------------------- model
     live = rip.races[0].live
     rows, meta = MD.analyse_race(live, "UK", CAL)
@@ -307,6 +328,33 @@ def main():
     check("the confidence caveat is present",
           any("not** a hit rate" in i.value or "not a hit rate" in i.value
               for i in at.info))
+
+    # switching race must keep the prediction AND show a different field
+    rsel = sb(at, "Race")
+    check("a race picker appears", rsel is not None and len(rsel.options) > 1)
+
+    def shown(a):
+        d = [x.value for x in a.dataframe
+             if "Calibrated %" in getattr(x.value, "columns", [])]
+        return tuple(d[0]["Horse"]) if d else ()
+
+    fields = []
+    for opt in rsel.options[:4]:
+        sb(at, "Race").set_value(opt).run()
+        check(f"{opt}: switching race does not raise", not at.exception)
+        b = " ".join(m.value for m in at.markdown)
+        check(f"{opt}: the prediction is still on screen",
+              "Betting recommendation" in b)
+        check(f"{opt}: the parsed meeting survived the rerun",
+              "wp_mt" in at.session_state and "wp_done" in at.session_state)
+        fields.append(shown(at))
+    check("each race shows a different field", len(set(fields)) == len(fields))
+
+    # any unrelated rerun must also leave the prediction standing
+    sb(at, "Region").set_value("UK").run()
+    check("changing an unrelated setting keeps the prediction",
+          not at.exception
+          and any("Betting recommendation" in m.value for m in at.markdown))
 
     # a provisional region must say so
     at2 = AppTest.from_file("app.py", default_timeout=900).run()

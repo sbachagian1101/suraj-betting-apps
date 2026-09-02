@@ -119,6 +119,34 @@ def _rows(text: str):
     return list(csv.reader(io.StringIO(text), delimiter=delim))
 
 
+def upload_fingerprint(name: str, data: bytes) -> str:
+    """Identify an uploaded file so it is ingested once, not every rerun.
+
+    st.file_uploader keeps returning the same file on every rerun, so acting
+    on `if up is not None` re-ran the ingest on every widget change -- which
+    wiped the parsed meeting and bounced the user back to Parse/Predict as
+    soon as they touched the race dropdown.
+    """
+    import hashlib
+    h = hashlib.sha256(data or b"").hexdigest()[:16]
+    return f"{name}:{len(data or b'')}:{h}"
+
+
+def ingest_upload(previous_fp, filename: str, data: bytes):
+    """Decide whether an uploaded file is new, and unpack it if so.
+
+    Returns (should_ingest, fingerprint, text, meeting_name). The caller
+    stores the fingerprint and only touches its state when should_ingest is
+    True, which is the whole point: st.file_uploader hands the same file back
+    on every rerun.
+    """
+    fp = upload_fingerprint(filename, data)
+    if fp == previous_fp:
+        return False, fp, None, None
+    text = (data or b"").decode("utf-8-sig", errors="replace")
+    return True, fp, text, meeting_name_from_filename(filename)
+
+
 def meeting_name_from_filename(name: str) -> str:
     """'Tuesday, 01st September 2026 - Ripon Races Worksheets (1).csv'."""
     n = re.sub(r"\.csv$", "", name or "", flags=re.I)

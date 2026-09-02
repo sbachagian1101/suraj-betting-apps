@@ -134,20 +134,30 @@ if c2.button("Load bundled meeting", width="stretch") and pick != "-":
     st.session_state["wp_name"] = pick.replace("-", " ").title()
     st.session_state.pop("wp_mt", None)
     st.session_state.pop("wp_done", None)
+    st.session_state.pop("wp_race", None)
 if c3.button("Clear", width="stretch"):
     st.session_state["wp_raw"] = ""
-    st.session_state.pop("wp_mt", None)
-    st.session_state.pop("wp_done", None)
+    for k in ("wp_mt", "wp_done", "wp_race", "wp_upload"):
+        st.session_state.pop(k, None)
 
 up = st.file_uploader("...or upload a Worksheets CSV", type=["csv", "txt"])
 if up is not None:
-    st.session_state["wp_raw"] = up.getvalue().decode("utf-8-sig",
-                                                      errors="replace")
-    st.session_state["wp_name"] = PS.meeting_name_from_filename(up.name)
-    st.session_state.pop("wp_mt", None)
+    # The uploader hands back the same file on EVERY rerun, so this has to be
+    # keyed on the file itself. Ingesting unconditionally wiped the parsed
+    # meeting each time any other widget moved, which is what sent the user
+    # back to Parse/Predict the moment they changed race.
+    fresh, fp, text, mname = PS.ingest_upload(
+        st.session_state.get("wp_upload"), up.name, up.getvalue())
+    if fresh:
+        st.session_state["wp_upload"] = fp
+        st.session_state["wp_raw"] = text
+        st.session_state["wp_name"] = mname
+        for k in ("wp_mt", "wp_done", "wp_race"):
+            st.session_state.pop(k, None)
 
-name = st.text_input("Meeting name", value=st.session_state.get(
-    "wp_name", ""), placeholder="e.g. Ripon")
+if "wp_name" not in st.session_state:
+    st.session_state["wp_name"] = ""
+name = st.text_input("Meeting name", key="wp_name", placeholder="e.g. Ripon")
 st.text_area("Worksheet text", key="wp_raw", height=190,
              label_visibility="collapsed",
              placeholder="Tab,Horse,RFS,DLS,12m,BRR,FORM,COND,CONS,BP,JOCK,"
@@ -211,7 +221,9 @@ if mt is not None and st.session_state.get("wp_done"):
     if not idx_map:
         st.error("No race has two or more unscratched runners.")
         st.stop()
-    sel = st.selectbox("Race", labels, index=0)
+    sel = st.selectbox("Race", labels, key="wp_race")
+    if sel not in labels:                     # field changed under the key
+        sel = labels[0]
     race = idx_map[labels.index(sel)]
 
     rows, meta = MD.analyse_race(race.live, region, CAL)
