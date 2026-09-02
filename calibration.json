@@ -1,0 +1,73 @@
+{
+  "global_t": 2.0,
+  "regions": {
+    "AUS": 0.6,
+    "FR": 1.5,
+    "IRE": 2.175,
+    "UK": 6.55
+  },
+  "backing": {
+    "AUS": 2,
+    "FR": 1,
+    "IRE": 1,
+    "UK": 4
+  },
+  "global_place_t": 1.7,
+  "place_regions": {
+    "AUS": 1.45,
+    "FR": 1.9,
+    "IRE": 2.2,
+    "UK": 1.2
+  },
+  "fitted_on": {
+    "races": 61,
+    "runners": 551,
+    "meetings": 8,
+    "date": "2026-09-01"
+  },
+  "record": {
+    "top_pick_win": 0.3115,
+    "top_three": 0.6066,
+    "random_win": 0.1242,
+    "random_top_three": 0.3725,
+    "logloss_calibrated_oos": 2.0293,
+    "logloss_published": 2.65,
+    "logloss_uniform": 2.1445,
+    "overall_ratio": 1.38,
+    "objective": "top-pick strike rate (moment matching)"
+  },
+  "region_detail": {
+    "AUS": {
+      "races": 16,
+      "claims": 0.3331,
+      "actual": 0.5,
+      "ratio": 0.666,
+      "meetings": 2,
+      "validated": true
+    },
+    "FR": {
+      "races": 8,
+      "claims": 0.3338,
+      "actual": 0.375,
+      "ratio": 0.89,
+      "meetings": 1,
+      "validated": false
+    },
+    "IRE": {
+      "races": 8,
+      "claims": 0.4629,
+      "actual": 0.25,
+      "ratio": 1.852,
+      "meetings": 1,
+      "validated": false
+    },
+    "UK": {
+      "races": 29,
+      "claims": 0.5003,
+      "actual": 0.2069,
+      "ratio": 2.418,
+      "meetings": 4,
+      "validated": true
+    }
+  }
+}
