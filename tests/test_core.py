@@ -80,6 +80,72 @@ B TRAINER
 """
 
 
+PLAIN_BROWSER = r"""
+Test Park Form Guide (Race 2) | Enhanced Form
+Thursday, 03rd September 2026
+16:00
+(local)
+Test Handicap
+Type: HCP Fastest Time: 1:10.00 Example
+AUD $10,000
+1200m TURF GOOD
+1
+2.50
+ALPHA 4yo B Gelding (BP: 1) 58.0kg
+Jockey
+A RIDER
+Last50
+20%-40%-50
+Trainer
+A TRAINER
+Last50
+16%-36%-50
+Filters
+Car
+2-3-10
+Dist
+1-2-5
+Good
+2-2-8
+Facts
+DLS
+14
+Days Since Last Run: 14 days (3U)
+1 of 8
+10d
+80
+OHR
+01 Aug 2026 (33d ago) TEST PARK (AUSTRALIA): Margin 1L Distance 1200m Surface T SOT G Class HCP API 2.0 Race Time 1:10.00 Jockey A RIDER Weight 58 BP 1 SP $3.0 Trainer A TRAINER Track Direction Clockwise
+2
+4.00
+BETA 4yo B Mare (BP: 4) 57.0kg
+Jockey
+B RIDER
+Last50
+8%-20%-50
+Trainer
+B TRAINER
+Last50
+6%-18%-50
+Filters
+Car
+0-2-12
+Dist
+0-1-5
+Good
+0-1-8
+Facts
+DLS
+21
+Days Since Last Run: 21 days (4U)
+5 of 8
+14d
+65
+OHR
+01 Aug 2026 (33d ago) TEST PARK (AUSTRALIA): Margin 5L Distance 1200m Surface T SOT G Class HCP API 2.0 Race Time 1:10.00 Jockey B RIDER Weight 57 BP 4 SP $6.0 Trainer B TRAINER Track Direction Clockwise
+"""
+
+
 def test_parser_and_probability_sum() -> None:
     card = parse_race(HORSE)
     assert card.discipline == "thoroughbred"
@@ -89,6 +155,16 @@ def test_parser_and_probability_sum() -> None:
     result = score_race(features, card.discipline)
     assert np.isclose(result.table["win_probability"].sum(), 1.0)
     assert result.table.iloc[0]["runner"] == "ALPHA"
+
+
+def test_plain_browser_clipboard_fallback() -> None:
+    card = parse_race(PLAIN_BROWSER)
+    assert card.race["field_size"] == 2
+    assert [r["runner"] for r in card.runners] == ["ALPHA", "BETA"]
+    assert card.runners[0]["market_odds"] == 2.50
+    assert card.runners[1]["market_odds"] == 4.00
+    assert len(card.histories) == 2
+    assert card.race["parser_mode"] == "browser-clipboard-fallback"
 
 
 def test_devig_and_ev_formula() -> None:
