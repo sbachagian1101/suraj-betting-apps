@@ -108,14 +108,23 @@ def _display_prediction_table(df: pd.DataFrame) -> None:
 
 def _make_training_rows(card: ParsedRace, features: pd.DataFrame, winner: str | None = None) -> pd.DataFrame:
     out = features.copy()
-    out.insert(0, "race_id", _race_id(card))
-    out.insert(1, "race_date", card.race.get("date"))
-    out.insert(2, "track", card.race.get("track"))
-    out.insert(3, "race_no", card.race.get("race_no"))
-    out.insert(4, "race_name", card.race.get("race_name"))
-    out.insert(5, "discipline", card.discipline)
+    # Feature engineering already carries some race metadata (notably discipline).
+    # Assign metadata first, then reorder it, rather than blindly inserting a
+    # duplicate column and crashing the whole Streamlit page.
+    metadata = {
+        "race_id": _race_id(card),
+        "race_date": card.race.get("date"),
+        "track": card.race.get("track"),
+        "race_no": card.race.get("race_no"),
+        "race_name": card.race.get("race_name"),
+        "discipline": card.discipline,
+    }
+    for column, value in metadata.items():
+        out[column] = value
     out["won"] = (out["runner"] == winner).astype(int) if winner else 0
-    return out
+    front = ["race_id", "race_date", "track", "race_no", "race_name", "discipline"]
+    remaining = [column for column in out.columns if column not in front]
+    return out[front + remaining]
 
 
 for key, default in {
