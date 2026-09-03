@@ -60,7 +60,12 @@ def parse_filename(name: str) -> dict | None:
 
 
 def league_label(key: str) -> str:
-    return key.replace("-", " ").title()
+    """'kazakhstan-first-division' -> 'Kazakhstan First Division'. FootyStats sometimes
+    repeats the country ('uzbekistan-uzbekistan-super-league'); drop the duplicate."""
+    words = key.split("-")
+    if len(words) > 1 and words[0] == words[1]:
+        words = words[1:]
+    return " ".join(words).title()
 
 
 def discover_leagues(dirs: Iterable[Path]) -> dict[str, list[Path]]:

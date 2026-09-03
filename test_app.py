@@ -28,6 +28,7 @@ def test_filename_parsing():
     assert info["season"] == "2025-26" and info["kind"] == "matches"
     assert M.parse_filename("random.csv") is None
     assert M.league_label("kazakhstan-first-division") == "Kazakhstan First Division"
+    assert M.league_label("uzbekistan-uzbekistan-super-league") == "Uzbekistan Super League"
 
 
 def test_discover_leagues(leagues):
