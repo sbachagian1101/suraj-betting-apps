@@ -1,210 +1,444 @@
-"""Streamlit app for Racing & Sports greyhound form parsing and prediction."""
 from __future__ import annotations
 
-import io
+import json
+import re
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import streamlit as st
 
-import greyhound_model as model
-import greyhound_parser as parser
+from racing_ev.features import build_feature_frame
+from racing_ev.model import explain_runner, load_artifact, score_race
+from racing_ev.odds import add_value_columns
+from racing_ev.parser import ParsedRace, parse_race
+from racing_ev.training import artifact_bytes, train_models
 
-st.set_page_config(page_title="GreyhoundPredictor", page_icon="🐕", layout="wide", initial_sidebar_state="expanded")
-st.markdown("""
+
+st.set_page_config(
+    page_title="Racing EV Lab",
+    page_icon="🏁",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+st.markdown(
+    """
 <style>
-.block-container {padding-top: 1.15rem; padding-bottom: 3rem;}
-div[data-testid="stMetric"] {border:1px solid rgba(128,128,128,.22);border-radius:.7rem;padding:.55rem .8rem;}
-.hero {padding:1rem 1.1rem;border-radius:.85rem;background:linear-gradient(135deg,rgba(124,77,255,.18),rgba(0,0,0,0));border:1px solid rgba(128,128,128,.22);margin-bottom:1rem;}
-.pick {padding:1rem 1.2rem;border:1px solid rgba(46,204,113,.35);border-radius:.8rem;background:rgba(46,204,113,.08);margin:.4rem 0 1rem 0;}
-.muted {opacity:.72;font-size:.9rem;}
+.block-container {padding-top: 1.4rem; padding-bottom: 3rem;}
+[data-testid="stMetricValue"] {font-size: 1.55rem;}
+.small-note {font-size: 0.88rem; opacity: 0.82;}
+.ev-positive {padding: .65rem .8rem; border-radius: .5rem; background: rgba(30,160,90,.10);}
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
-def reset_app() -> None:
-    st.session_state["paste_input"] = ""
-    for k in ("header", "runners", "warnings", "result"):
-        st.session_state.pop(k, None)
+def _race_id(card: ParsedRace) -> str:
+    race = card.race
+    bits = [
+        str(race.get("discipline", "race")),
+        str(race.get("date", "unknown-date")),
+        str(race.get("track", "unknown-track")),
+        f"R{race.get('race_no', 'x')}",
+    ]
+    return "_".join(re.sub(r"[^A-Za-z0-9-]+", "-", x).strip("-").lower() for x in bits)
 
 
-def race_title(h: dict[str, Any]) -> str:
-    bits = [str(h.get("track", "")).strip(), f"R{h.get('race_no')}" if h.get("race_no") else "", str(h.get("race_name", "")).strip()]
-    return " · ".join(x for x in bits if x) or "Parsed greyhound race"
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating,)):
+        return None if np.isnan(value) else float(value)
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    return value
 
 
-def race_subtitle(h: dict[str, Any]) -> str:
-    bits = [f"{h.get('distance_m')}m" if h.get("distance_m") else "", h.get("surface", ""), h.get("going", ""), h.get("race_type", ""), h.get("prize", ""), h.get("date", "")]
-    return " | ".join(str(x) for x in bits if x)
-
-
-def rec_str(r: dict[str, Any], prefix: str) -> str:
-    return str(r.get(f"{prefix}_rec", "0-0-0"))
-
-
-def parsed_df(runners: list[dict[str, Any]]) -> pd.DataFrame:
+def _serialisable_runner_frame(card: ParsedRace) -> pd.DataFrame:
     rows = []
-    for r in runners:
-        box = int(r.get("box", 0) or 0)
-        bs = r.get("box_stats", {}).get(box, {}) if box else {}
-        recent = r.get("recent_runs", []); last = recent[0] if recent else {}
-        rows.append({
-            "Tab": r.get("tab"), "Box": box or "", "Greyhound": r.get("horse"), "Scr": "Y" if r.get("scratched") else "",
-            "Wt": r.get("weight"), "Trainer": r.get("trainer"), "TAB$": r.get("tab_odds"), "BF$": r.get("bf_odds"),
-            "Form": r.get("form", ""), "Tra W%": 100*r.get("trainer_win", 0), "Tra P%": 100*r.get("trainer_place", 0),
-            "Tra/Dist Best": r.get("tra_dist_best") or "", "Career": rec_str(r,"career"), "Course": rec_str(r,"course"),
-            "Dist": rec_str(r,"distance"), "C&D": rec_str(r,"course_distance"), "DLS": r.get("dls"),
-            "Box W-S": f"{bs.get('wins',0)}-{bs.get('starts',0)}", "Last Fin": last.get("finish", ""),
-            "Last Mgn": last.get("margin", ""), "Last MRKΔ": last.get("mrk_delta", ""), "Last Split": last.get("first_split", ""),
-            "Last Settle": last.get("settle_pos", ""), "Last Note": last.get("stewards", ""),
-        })
+    for runner in card.runners:
+        row = runner.copy()
+        if isinstance(row.get("box_stats"), dict):
+            row["box_stats"] = json.dumps(row["box_stats"], sort_keys=True)
+        rows.append(row)
     return pd.DataFrame(rows)
 
 
-def prediction_df(result: dict[str, Any]) -> pd.DataFrame:
-    rows = []; active = result["runners"]; c = result["components"]
-    for rank, i in enumerate(result["order"], start=1):
-        r = active[i]
-        rows.append({
-            "Pred": rank, "Tab": r.get("tab"), "Box": r.get("box"), "Greyhound": r.get("horse"),
-            "Early": int(result["early_rank"][i]), "Market%": 100*result["p_mkt"][i], "Fund%": 100*result["p_fund"][i],
-            "Win%": 100*result["p_win"][i], "Top2%": 100*result["top2"][i], "Top3%": 100*result["top3"][i],
-            "E[pos]": result["exp_pos"][i], "Fair$": result["fair"][i], "BF$": r.get("bf_odds"), "EV": result["ev_win"][i],
-            "Conf": result["conf"][i], "Speed Z": c["speed"][i], "Early Z": c["early"][i], "Box Z": c["box"][i],
-            "C&D Z": c["trackdist"][i], "Form Z": c["form"][i], "Recommendation": result["recs"][i],
-        })
-    return pd.DataFrame(rows)
+def _recalculate(card: ParsedRace, features: pd.DataFrame, odds_frame: pd.DataFrame, artifact: dict | None, devig: str, commission: float) -> tuple[pd.DataFrame, str, str | None, float]:
+    scored = score_race(features, card.discipline, artifact=artifact)
+    table = scored.table.copy()
+    edited = odds_frame.set_index("runner")["market_odds"]
+    table["market_odds"] = table["runner"].map(edited)
+    value, overround = add_value_columns(table, method=devig, commission=commission)
+    return value, scored.model_name, scored.warning, overround
 
 
-def speed_map_df(result: dict[str, Any]) -> pd.DataFrame:
-    active = result["runners"]; rows = []
-    for idx in result["early_order"]:
-        r = active[idx]
-        rows.append({"Early Rank": int(result["early_rank"][idx]), "Box": r.get("box"), "Greyhound": r.get("horse"),
-                     "Early Score": result["components"]["early_raw"][idx], "Win%": 100*result["p_win"][idx]})
-    return pd.DataFrame(rows)
+def _display_prediction_table(df: pd.DataFrame) -> None:
+    show = df[[
+        "model_rank", "tab", "runner", "market_odds", "win_probability", "fair_odds",
+        "market_probability_fair", "probability_edge", "ev_pct", "data_quality", "value_grade",
+    ]].copy()
+    show["win_probability"] *= 100.0
+    show["market_probability_fair"] *= 100.0
+    show["probability_edge"] *= 100.0
+    show["data_quality"] *= 100.0
+    show.columns = [
+        "Rank", "No.", "Runner", "Odds", "Model win %", "Model fair odds",
+        "No-vig market %", "Probability edge", "EV %", "Data quality %", "Assessment",
+    ]
+    st.dataframe(
+        show,
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "Odds": st.column_config.NumberColumn(format="%.2f"),
+            "Model win %": st.column_config.NumberColumn(format="%.1f%%"),
+            "Model fair odds": st.column_config.NumberColumn(format="%.2f"),
+            "No-vig market %": st.column_config.NumberColumn(format="%.1f%%"),
+            "Probability edge": st.column_config.NumberColumn(format="%+.1f%%"),
+            "EV %": st.column_config.NumberColumn(format="%+.1f%%"),
+            "Data quality %": st.column_config.ProgressColumn(min_value=0.0, max_value=100.0, format="%.0f%%"),
+        },
+    )
 
 
-def csv_bytes(df: pd.DataFrame) -> bytes:
-    s = io.StringIO(); df.to_csv(s, index=False); return s.getvalue().encode("utf-8")
+def _make_training_rows(card: ParsedRace, features: pd.DataFrame, winner: str | None = None) -> pd.DataFrame:
+    out = features.copy()
+    out.insert(0, "race_id", _race_id(card))
+    out.insert(1, "race_date", card.race.get("date"))
+    out.insert(2, "track", card.race.get("track"))
+    out.insert(3, "race_no", card.race.get("race_no"))
+    out.insert(4, "race_name", card.race.get("race_name"))
+    out.insert(5, "discipline", card.discipline)
+    out["won"] = (out["runner"] == winner).astype(int) if winner else 0
+    return out
 
-for k, v in (("header", {}), ("runners", []), ("warnings", []), ("result", None)):
-    st.session_state.setdefault(k, v)
 
-st.markdown('<div class="hero"><h1 style="margin:0">🐕 GreyhoundPredictor</h1><div class="muted">Racing & Sports Enhanced Form parser · greyhound speed-map + probability model</div></div>', unsafe_allow_html=True)
+for key, default in {
+    "card": None,
+    "features": None,
+    "prediction": None,
+    "model_name": None,
+    "model_warning": None,
+    "overround": None,
+    "artifact": None,
+    "artifact_bytes": None,
+    "training_metrics": None,
+}.items():
+    st.session_state.setdefault(key, default)
+
+
+st.title("🏁 Racing EV Lab")
+st.caption("One parser and probability/EV workflow for thoroughbred, harness and greyhound Racing & Sports Enhanced Form text.")
 
 with st.sidebar:
-    st.header("Model settings")
-    alpha = st.slider("Market weight α", .30, .90, float(model.MARKET_ALPHA), .01,
-                      help="Higher = final probabilities follow market odds more closely; lower = fundamentals matter more.")
-    sims = st.select_slider("Finishing-order simulations", options=[5_000,10_000,20_000,30_000,50_000], value=20_000)
-    seed = st.number_input("Random seed", 0, 999999, 42, 1)
+    st.header("Calculation settings")
+    discipline_choice = st.selectbox("Input discipline", ["Auto-detect", "Thoroughbred", "Harness", "Greyhound"])
+    devig_method = st.selectbox("Remove bookmaker margin using", ["Power", "Proportional"], index=0)
+    exchange_commission_pct = st.number_input("Exchange commission on winnings (%)", min_value=0.0, max_value=15.0, value=0.0, step=0.5)
     st.divider()
-    st.caption("Greyhound fundamentals: adjusted speed/MRK → early pace → box history → track & distance → recent form → trainer → freshness.")
-    st.caption("Prediction is probabilistic decision support, not a guaranteed outcome.")
+    st.subheader("Optional trained model")
+    model_file = st.file_uploader("Upload a Racing EV Lab .joblib model", type=["joblib", "pkl"], key="model_upload")
+    if model_file is not None:
+        try:
+            st.session_state.artifact = load_artifact(model_file.getvalue())
+            st.success("Trained model loaded.")
+        except Exception as exc:
+            st.error(f"Model could not be loaded: {exc}")
+    if st.session_state.artifact:
+        artifact = st.session_state.artifact
+        st.caption(
+            f"Discipline: {str(artifact.get('discipline', 'legacy/unspecified')).title()}  ·  "
+            f"Training races: {artifact.get('trained_races', '—')}  ·  "
+            f"Validation races: {artifact.get('validation_races', '—')}"
+        )
+    st.divider()
+    st.caption("Current odds never enter the independent form score. They are applied only after the probability calculation to estimate market edge and EV.")
 
-paste_tab, parsed_tab, speed_tab, pred_tab, explain_tab, method_tab = st.tabs([
-    "1 · Paste Data", "2 · Parsed Data", "3 · Speed Map", "4 · Prediction", "5 · Explanations", "Method"
+
+tabs = st.tabs([
+    "1 · Input",
+    "2 · Prediction & EV",
+    "3 · Parsed data",
+    "4 · Data builder",
+    "5 · Model lab",
+    "6 · Method",
 ])
 
-with paste_tab:
-    st.subheader("Paste the full Racing & Sports greyhound Enhanced Form page")
-    st.caption("Select all on the Enhanced Form page, copy, then paste below. Scratches and reserves are handled automatically where the field table identifies them.")
-    pasted = st.text_area("Race data", key="paste_input", height=430, placeholder="Paste greyhound Enhanced Form text here…", label_visibility="collapsed")
-    c1,c2,c3 = st.columns([1,1,5])
-    with c1: parse_clicked = st.button("Parse race ▶", type="primary", use_container_width=True)
-    with c2: st.button("Clear", on_click=reset_app, use_container_width=True)
-    if parse_clicked:
-        if len(pasted.strip()) < 300:
-            st.error("The pasted text looks too short. Paste the full Enhanced Form page.")
+with tabs[0]:
+    st.subheader("Paste or upload one Enhanced Form race")
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        uploaded = st.file_uploader("Upload .md or .txt", type=["md", "txt"], key="race_upload")
+    with col2:
+        st.info("Use Select All → Copy on the Enhanced Form page, or save the copied content as Markdown/text. Odds can be corrected in the next tab.")
+    pasted = st.text_area("Paste complete race text", height=330, placeholder="Paste the full Enhanced Form page here…")
+    if st.button("Parse race and calculate", type="primary", use_container_width=True):
+        raw = uploaded.getvalue().decode("utf-8", errors="replace") if uploaded is not None else pasted
+        chosen = discipline_choice.lower() if discipline_choice != "Auto-detect" else "auto"
+        with st.spinner("Parsing race, runner profiles and past starts…"):
+            card = parse_race(raw, chosen)
+            features = build_feature_frame(card) if card.runners else pd.DataFrame()
+        st.session_state.card = card
+        st.session_state.features = features
+        if features.empty:
+            st.error("No active runners could be scored. Check the parser warnings below.")
         else:
+            odds = features[["tab", "runner", "market_odds"]].copy()
             try:
-                h, rs, ws = parser.parse(pasted)
-                st.session_state.update(header=h, runners=rs, warnings=ws, result=None)
-                active = [r for r in rs if not r.get("scratched")]
-                if active: st.success(f"Parsed {len(rs)} listed runners: {len(active)} active and {len(rs)-len(active)} scratched.")
-                else: st.error("No active runners were found.")
-            except Exception as exc: st.exception(exc)
-    if st.session_state["runners"]: st.info(f"Current race: **{race_title(st.session_state['header'])}**")
-    if st.session_state["warnings"]:
-        with st.expander(f"Parser warnings ({len(st.session_state['warnings'])})"):
-            for w in st.session_state["warnings"]: st.warning(w)
+                pred, model_name, warning, overround = _recalculate(
+                    card, features, odds, st.session_state.artifact,
+                    devig_method.lower(), exchange_commission_pct / 100.0,
+                )
+                st.session_state.prediction = pred
+                st.session_state.model_name = model_name
+                st.session_state.model_warning = warning
+                st.session_state.overround = overround
+                st.success(f"Parsed {card.race.get('field_size', len(features))} active runners and {len(card.histories)} historical starts.")
+            except Exception as exc:
+                st.session_state.prediction = None
+                st.warning(f"Race parsed, but EV is unavailable until every active runner has valid decimal odds: {exc}")
+        for warning in card.warnings:
+            st.warning(warning)
 
-with parsed_tab:
-    rs, h = st.session_state["runners"], st.session_state["header"]
-    if not rs: st.info("Parse a race in **1 · Paste Data** first.")
-    else:
-        st.subheader(race_title(h)); st.caption(race_subtitle(h)); df = parsed_df(rs)
-        st.dataframe(df, use_container_width=True, hide_index=True, height=520,
-                     column_config={"Tra W%":st.column_config.NumberColumn(format="%.1f%%"),"Tra P%":st.column_config.NumberColumn(format="%.1f%%")})
-        st.download_button("Download parsed data (CSV)", data=csv_bytes(df), file_name="greyhound_parsed.csv", mime="text/csv")
+    card = st.session_state.card
+    if card:
+        r = card.race
+        st.markdown("### Current parsed race")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Discipline", str(r.get("discipline", "—")).title())
+        m2.metric("Track / race", f"{r.get('track', '—')} R{r.get('race_no', '—')}")
+        m3.metric("Distance", r.get("distance_text", "—"))
+        m4.metric("Active field", r.get("field_size", "—"))
+        st.write(f"**{r.get('race_name', 'Unnamed race')}** · {r.get('date_text', '')} · {r.get('surface', '')} {r.get('going', '')}")
 
-with speed_tab:
-    rs, h = st.session_state["runners"], st.session_state["header"]
-    if not rs: st.info("Parse a race first.")
+with tabs[1]:
+    card = st.session_state.card
+    features = st.session_state.features
+    if card is None or features is None or features.empty:
+        st.info("Parse a race in the Input tab first.")
     else:
-        if st.button("Build speed map ▶", type="primary"):
-            try: st.session_state["result"] = model.predict(rs, h, alpha=float(alpha), sims=int(sims), seed=int(seed))
-            except Exception as exc: st.exception(exc)
-        result = st.session_state["result"]
-        if result:
-            sdf = speed_map_df(result); leader = sdf.iloc[0]
-            st.markdown(f"### Projected leader: **Box {leader['Box']} · {leader['Greyhound']}**")
-            st.dataframe(sdf, use_container_width=True, hide_index=True,
-                         column_config={"Win%": st.column_config.NumberColumn(format="%.1f%%"), "Early Score": st.column_config.NumberColumn(format="%.3f")})
-            st.caption("The speed map uses recent settling position/start notes plus the current box profile. Raw first-split seconds are not compared blindly across different tracks/distances.")
-
-with pred_tab:
-    rs, h = st.session_state["runners"], st.session_state["header"]
-    if not rs: st.info("Parse a race first.")
-    else:
-        st.subheader(race_title(h)); st.caption(race_subtitle(h))
-        if st.button("Predict race ▶", type="primary", key="predict"):
+        st.subheader("Independent win probabilities versus current odds")
+        odds_default = features[["tab", "runner", "market_odds"]].copy()
+        st.caption("Verify the detected odds and replace them with the same bookmaker/exchange snapshot for every runner. Mixed timestamps or mixed bookmakers distort EV.")
+        odds_edited = st.data_editor(
+            odds_default,
+            hide_index=True,
+            use_container_width=True,
+            disabled=["tab", "runner"],
+            column_config={
+                "tab": st.column_config.NumberColumn("No.", format="%d"),
+                "runner": st.column_config.TextColumn("Runner"),
+                "market_odds": st.column_config.NumberColumn("Current decimal odds", min_value=1.01, step=0.05, format="%.2f"),
+            },
+            key=f"odds_{_race_id(card)}",
+        )
+        if st.button("Recalculate EV with edited odds", type="primary"):
             try:
-                with st.spinner("Running greyhound ensemble and finishing-order simulation…"):
-                    st.session_state["result"] = model.predict(rs, h, alpha=float(alpha), sims=int(sims), seed=int(seed))
-            except Exception as exc: st.exception(exc)
-        result = st.session_state["result"]
-        if result:
-            df = prediction_df(result); winner = df.iloc[0]
-            st.markdown(f'<div class="pick"><div class="muted">MODEL TOP PICK</div><h2 style="margin:.1rem 0">Box {winner["Box"]} · {winner["Greyhound"]}</h2><b>Win {winner["Win%"]:.1f}%</b> · Top 3 {winner["Top3%"]:.1f}% · Fair ${winner["Fair$"]:.2f} · EV {winner["EV"]:+.2f} · Confidence {int(winner["Conf"])}/9</div>', unsafe_allow_html=True)
-            m1,m2,m3,m4 = st.columns(4)
-            m1.metric("Overall confidence", f"{result['overall_conf']}/9"); m2.metric("Market weight", f"{alpha:.2f}")
-            m3.metric("Projected leader", str(result["runners"][result["early_order"][0]]["horse"])); m4.metric("Active field", str(len(result["runners"])))
-            st.dataframe(df, use_container_width=True, hide_index=True, height=520, column_config={
-                "Market%":st.column_config.NumberColumn(format="%.1f%%"),"Fund%":st.column_config.NumberColumn(format="%.1f%%"),
-                "Win%":st.column_config.ProgressColumn(format="%.1f%%",min_value=0,max_value=100),"Top2%":st.column_config.NumberColumn(format="%.1f%%"),
-                "Top3%":st.column_config.NumberColumn(format="%.1f%%"),"E[pos]":st.column_config.NumberColumn(format="%.2f"),
-                "Fair$":st.column_config.NumberColumn(format="$%.2f"),"BF$":st.column_config.NumberColumn(format="$%.2f"),"EV":st.column_config.NumberColumn(format="%+.2f"),
-                "Speed Z":st.column_config.NumberColumn(format="%+.2f"),"Early Z":st.column_config.NumberColumn(format="%+.2f"),"Box Z":st.column_config.NumberColumn(format="%+.2f"),
-                "C&D Z":st.column_config.NumberColumn(format="%+.2f"),"Form Z":st.column_config.NumberColumn(format="%+.2f"),})
-            st.download_button("Download prediction (CSV)", data=csv_bytes(df), file_name="greyhound_prediction.csv", mime="text/csv")
+                pred, model_name, warning, overround = _recalculate(
+                    card, features, odds_edited, st.session_state.artifact,
+                    devig_method.lower(), exchange_commission_pct / 100.0,
+                )
+                st.session_state.prediction = pred
+                st.session_state.model_name = model_name
+                st.session_state.model_warning = warning
+                st.session_state.overround = overround
+            except Exception as exc:
+                st.error(str(exc))
 
-with explain_tab:
-    result = st.session_state["result"]
-    if not result: st.info("Run the prediction first.")
+        prediction = st.session_state.prediction
+        if prediction is not None:
+            top = prediction.sort_values("win_probability", ascending=False).iloc[0]
+            best_ev = prediction.sort_values("ev_per_unit", ascending=False).iloc[0]
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Model top pick", top["runner"])
+            c2.metric("Top-pick win chance", f"{top['win_probability']:.1%}")
+            c3.metric("Detected market overround", f"{100 * float(st.session_state.overround or 0):.1f}%")
+            c4.metric("Highest model EV", f"{best_ev['runner']} · {best_ev['ev_pct']:+.1f}%")
+            st.caption(f"Model: {st.session_state.model_name}")
+            if st.session_state.model_warning:
+                st.warning(st.session_state.model_warning)
+
+            _display_prediction_table(prediction)
+
+            chart = prediction.sort_values("win_probability", ascending=False).set_index("runner")[["win_probability", "market_probability_fair"]]
+            chart.columns = ["Model win probability", "No-vig market probability"]
+            st.bar_chart(chart)
+
+            candidates = prediction[(prediction["ev_per_unit"] > 0) & (prediction["probability_edge"] > 0)].copy()
+            st.markdown("### Positive-EV candidates under the entered odds")
+            if candidates.empty:
+                st.info("The model does not identify a positive-EV runner at these prices.")
+            else:
+                st.dataframe(
+                    candidates[["runner", "market_odds", "win_probability", "fair_odds", "probability_edge", "ev_pct", "value_grade"]],
+                    hide_index=True,
+                    use_container_width=True,
+                )
+            st.caption("EV per unit = model probability × net decimal odds − 1. A positive estimate can still lose; it is not proof of a profitable edge.")
+
+with tabs[2]:
+    card = st.session_state.card
+    if card is None:
+        st.info("Parse a race first.")
     else:
-        st.subheader(f"Runner explanations · confidence {result['overall_conf']}/9")
-        for rank, i in enumerate(result["order"], start=1):
-            r = result["runners"][i]
-            with st.expander(f"{rank}. Box {r.get('box')} · {r.get('horse')} — Win {result['p_win'][i]*100:.1f}% · {result['recs'][i]}", expanded=rank<=3):
-                st.markdown(f"**{result['recs'][i]}**"); st.write(result["why"][i]); c = result["components"]
-                st.dataframe(pd.DataFrame([{"Speed Z":c["speed"][i],"Early Z":c["early"][i],"Box Z":c["box"][i],"Track/Dist Z":c["trackdist"][i],
-                                            "Form Z":c["form"][i],"Trainer Z":c["trainer"][i],"Freshness Z":c["freshness"][i]}]), hide_index=True, use_container_width=True)
+        st.subheader("What the parser extracted")
+        race_df = pd.DataFrame([card.race])
+        runner_df = _serialisable_runner_frame(card)
+        history_df = pd.DataFrame(card.histories)
+        trial_df = pd.DataFrame(card.trials)
+        t1, t2, t3, t4 = st.tabs(["Race", "Runners", "Historical starts", "Trials"])
+        with t1:
+            st.dataframe(race_df, hide_index=True, use_container_width=True)
+        with t2:
+            st.dataframe(runner_df, hide_index=True, use_container_width=True)
+        with t3:
+            st.dataframe(history_df, hide_index=True, use_container_width=True)
+        with t4:
+            st.dataframe(trial_df, hide_index=True, use_container_width=True)
 
-with method_tab:
-    st.subheader("How the greyhound model works")
-    st.markdown("""
-1. **Field parsing** — extracts the race, active runners, scratches/reserves, weights, trainers and prices.
-2. **Adjusted speed** — recent R&S **BOM Time Adj** and **MRK delta** are recency-weighted, with extra weight for the same/similar distance and track.
-3. **Early pace / speed map** — settling positions and steward start notes estimate early position. The current box profile is added and a mild pace-clash adjustment is applied.
-4. **Box model** — uses each dog's own historical win/place/start record from the **current assigned box**, shrunk toward a broad baseline when the sample is small.
-5. **Track & distance** — Course, Distance and Course & Distance records plus trainer/distance best time where available.
-6. **Form, trainer and freshness** — recent finishing position/margins, trainer L50 strike rates and days since last start.
-7. **Fundamental probability** — component scores are standardized across the field and combined into a greyhound-specific ensemble.
-8. **Market blend** — TAB/Betfair probabilities are de-vigged and blended with fundamentals. The sidebar α controls market influence.
-9. **Finishing-order simulation** — Plackett-Luce simulations estimate Top-2, Top-3 and expected finishing position.
-10. **Value screen** — model fair odds are compared with the listed exchange price to estimate EV.
+        payload = {
+            "race": _json_safe(card.race),
+            "runners": _json_safe(card.runners),
+            "histories": _json_safe(card.histories),
+            "trials": _json_safe(card.trials),
+            "warnings": card.warnings,
+        }
+        d1, d2, d3, d4 = st.columns(4)
+        d1.download_button("Race CSV", race_df.to_csv(index=False), f"{_race_id(card)}_race.csv", "text/csv")
+        d2.download_button("Runners CSV", runner_df.to_csv(index=False), f"{_race_id(card)}_runners.csv", "text/csv")
+        d3.download_button("Starts CSV", history_df.to_csv(index=False), f"{_race_id(card)}_starts.csv", "text/csv")
+        d4.download_button("Complete JSON", json.dumps(payload, indent=2), f"{_race_id(card)}.json", "application/json")
 
-**Important:** track-specific box bias and fully normalized sectional databases would improve the model further. This version deliberately avoids comparing raw split seconds across unrelated tracks/distances when that would be misleading.
-""")
+        st.markdown("### Runner explanations")
+        pred = st.session_state.prediction
+        if pred is not None:
+            for _, row in pred.sort_values("model_rank").iterrows():
+                with st.expander(f"#{int(row['model_rank'])} · {row['runner']} · {row['win_probability']:.1%}"):
+                    st.write(f"Data quality: **{row['data_quality']:.0%}** · History used: **{int(row['history_count'])} starts**")
+                    parts = explain_runner(row, 6)
+                    explanation_rows = []
+                    for feature, contribution in parts:
+                        explanation_rows.append({
+                            "Factor": feature.replace("_", " ").title(),
+                            "Direction": "Supports" if contribution > 0 else "Opposes",
+                            "Contribution": contribution,
+                        })
+                    st.dataframe(pd.DataFrame(explanation_rows), hide_index=True, use_container_width=True)
+
+with tabs[3]:
+    st.subheader("Batch parser and canonical dataset builder")
+    st.write("Upload several saved Enhanced Form pages. The app will build consistent race, runner-feature and historical-start tables across all three disciplines. Train separate probability models for thoroughbred, harness and greyhound racing.")
+    batch_files = st.file_uploader("Upload multiple .md/.txt race pages", type=["md", "txt"], accept_multiple_files=True, key="batch_upload")
+    if batch_files and st.button("Build combined dataset"):
+        race_rows: list[dict] = []
+        feature_frames: list[pd.DataFrame] = []
+        history_rows: list[dict] = []
+        warnings: list[str] = []
+        for file in batch_files:
+            raw = file.getvalue().decode("utf-8", errors="replace")
+            card_i = parse_race(raw)
+            rid = _race_id(card_i)
+            race_row = {"race_id": rid, **card_i.race, "source_file": file.name}
+            race_rows.append(race_row)
+            if card_i.runners:
+                f = build_feature_frame(card_i)
+                f.insert(0, "race_id", rid)
+                f.insert(1, "race_date", card_i.race.get("date"))
+                f["source_file"] = file.name
+                feature_frames.append(f)
+            for run in card_i.histories:
+                history_rows.append({"race_id_context": rid, "source_file": file.name, **run})
+            warnings.extend([f"{file.name}: {w}" for w in card_i.warnings])
+        races = pd.DataFrame(race_rows)
+        features_all = pd.concat(feature_frames, ignore_index=True) if feature_frames else pd.DataFrame()
+        histories = pd.DataFrame(history_rows)
+        st.success(f"Processed {len(races)} race files, {len(features_all)} active runners and {len(histories)} historical starts.")
+        st.dataframe(features_all.head(200), hide_index=True, use_container_width=True)
+        b1, b2, b3 = st.columns(3)
+        b1.download_button("Download races.csv", races.to_csv(index=False), "races.csv", "text/csv")
+        b2.download_button("Download runner_features.csv", features_all.to_csv(index=False), "runner_features.csv", "text/csv")
+        b3.download_button("Download historical_starts.csv", histories.to_csv(index=False), "historical_starts.csv", "text/csv")
+        for warning in warnings:
+            st.warning(warning)
+
+with tabs[4]:
+    st.subheader("Build and calibrate a trained model")
+    st.warning("Train one discipline at a time. Do not train on current bookmaker odds, current neural ratings, or any information published after the race. Those create leakage and make backtests look unrealistically strong.")
+    card = st.session_state.card
+    features = st.session_state.features
+    if card is not None and features is not None and not features.empty:
+        winner = st.selectbox("After the race, select the actual winner to create labelled rows", ["— not known yet —"] + features["runner"].tolist())
+        chosen_winner = None if winner.startswith("—") else winner
+        rows = _make_training_rows(card, features, chosen_winner)
+        st.download_button(
+            "Download this race's labelled feature rows",
+            rows.to_csv(index=False),
+            f"{_race_id(card)}_training_rows.csv",
+            "text/csv",
+            disabled=chosen_winner is None,
+        )
+        template = _make_training_rows(card, features, None).head(0)
+        st.download_button("Download training schema", template.to_csv(index=False), "racing_ev_training_schema.csv", "text/csv")
+
+    st.markdown("#### Train from accumulated races")
+    training_file = st.file_uploader("Upload combined labelled runner-feature CSV", type=["csv"], key="training_csv")
+    if training_file is not None and st.button("Train with chronological holdout", type="primary"):
+        try:
+            data = pd.read_csv(training_file)
+            with st.spinner("Fitting logistic + gradient-boosting ensemble and selecting calibration temperature…"):
+                trained = train_models(data)
+            st.session_state.artifact = trained.artifact
+            st.session_state.artifact_bytes = artifact_bytes(trained.artifact)
+            st.session_state.training_metrics = trained.metrics
+            st.success("Model trained and loaded for the current session.")
+        except Exception as exc:
+            st.error(str(exc))
+    if st.session_state.training_metrics:
+        metrics = st.session_state.training_metrics
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Training races", int(metrics["training_races"]))
+        m2.metric("Validation races", int(metrics["validation_races"]))
+        m3.metric("Validation top-1", f"{metrics['validation_top1']:.1%}")
+        m4.metric("Race log loss", f"{metrics['validation_log_loss']:.3f}")
+        st.download_button(
+            "Download trained .joblib model",
+            st.session_state.artifact_bytes,
+            "racing_ev_model.joblib",
+            "application/octet-stream",
+        )
+
+with tabs[5]:
+    st.subheader("How the system should be used")
+    st.markdown(
+        r"""
+### Canonical data layers
+
+1. **Race context:** discipline, country, date/time, track, race number/type/class, distance, surface/going, prize and field size.
+2. **Current runner snapshot:** runner number, weight, barrier/box/handicap, rider/driver, trainer, strike rates, career/course/distance/going records, days since run, current gear and scratch status.
+3. **Historical starts:** date, track, distance, class, surface/going, finish, field size, beaten margin, speed/time/sectional measures, draw/box, carried weight, rider/driver, trouble notes and historical SP.
+4. **Odds snapshots:** bookmaker/exchange, timestamp, decimal odds and commission. Keep them outside the independent form model.
+5. **Outcome labels:** official finishing position, winner flag and scratch/non-starter status.
+
+### Probability workflow
+
+The built-in baseline creates discipline-specific form components, standardises them **within the current race**, combines them into a latent performance score and applies a softmax so all active runners sum to 100%. Sparse profiles are shrunk toward an equal-chance prior.
+
+For a credible production model, accumulate many completed races and train chronologically. Keep every runner from the same race in the same fold. Calibrate on races later than the training period, then test on a still-later untouched period.
+
+### Market and EV
+
+For decimal odds \(O_i\), raw implied probability is \(q_i=1/O_i\). The app removes the market margin across the complete field, calculates independent model probability \(p_i\), then reports:
+
+- **Probability edge:** \(p_i-p_{market,i}\)
+- **Model fair odds:** \(1/p_i\)
+- **Expected value per unit:** \(EV_i=p_i\times O_{net,i}-1\)
+
+A positive EV estimate is meaningful only when probabilities are calibrated out of time and the odds snapshot is realistic and timestamped. Evaluate log loss, Brier score, calibration, top-pick strike rate, return on turnover and drawdown—not strike rate alone.
+"""
+    )
+    st.error("Research tool only. Racing outcomes are uncertain, odds move, and model error can turn apparent value into a loss. Never treat estimated EV as guaranteed profit.")
