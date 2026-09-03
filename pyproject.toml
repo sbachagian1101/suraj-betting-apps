@@ -1,0 +1,9 @@
+[project]
+name = "racing-ev-lab"
+version = "0.1.0"
+description = "Streamlit parser, probability and expected-value lab for thoroughbred, harness and greyhound racing"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
