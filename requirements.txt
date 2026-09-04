@@ -1,0 +1,5 @@
+streamlit>=1.38,<2
+numpy>=1.26,<3
+pandas>=2.2,<3
+pillow>=10.1,<13
+altair>=5.0,<6
