@@ -67,7 +67,7 @@ def _results_html():
 
 
 def test_matches_from_html_filters_and_dedupes():
-    ms = SW._matches_from_html(_results_html(), "MBUGcjb9")
+    ms = SW._parse_matches(_results_html(), "MBUGcjb9")
     ids = [m.id for m in ms]
     assert ids == ["YZz3PZW7", "hdZnTHXr", "nHJfzC2N"]       # other team dropped, duplicate dropped
     assert all(m.competition == "NETHERLANDS: Eredivisie" for m in ms)
@@ -91,6 +91,60 @@ def test_stats_parsing_uses_full_time_section_only(monkeypatch):
     stats = SW.match_stats("x")
     assert SW.xg_from_stats(stats) == (1.92, 0.87)
     assert stats["Ball possession"] == (68.0, 32.0)
+
+
+def _daily_feed():
+    return "~".join([
+        rec(ZA="ENGLAND: Premier League"),
+        rec(AA="QsyJgS7m", AD="1788699600", AB="3", AE="Everton", AF="Manchester Utd",
+            PX="KluSTr9s", PY="ppjDR086", WU="everton", WV="manchester-united", AG="2", AH="2"),
+        rec(AA="Glagw7N6", AD="1788708600", AB="1", AE="Arsenal", AF="Chelsea",
+            PX="hA1Zm19f", PY="4fGZN2oK", WU="arsenal", WV="chelsea"),
+        rec(ZA="ENGLAND: Championship"),
+        rec(AA="cccccccc", AD="1788708600", AB="1", AE="Leeds", AF="Hull",
+            PX="11111111", PY="22222222", WU="leeds", WV="hull"),
+        rec(ZA="FRANCE: Ligue 1"),
+        rec(AA="ffffffff", AD="1788718600", AB="2", AE="Marseille", AF="Paris FC",
+            PX="33333333", PY="44444444", WU="marseille", WV="paris-fc", AG="1", AH="0"),
+    ])
+
+
+def test_daily_feed_parses_all_leagues_with_slugs():
+    ms = SW._parse_matches(_daily_feed())
+    assert [m.id for m in ms] == ["QsyJgS7m", "Glagw7N6", "cccccccc", "ffffffff"]
+    assert ms[0].competition == "ENGLAND: Premier League" and ms[3].competition == "FRANCE: Ligue 1"
+    assert ms[0].home_slug == "everton" and ms[0].away_slug == "manchester-united"
+    assert [m.status for m in ms] == ["Finished", "Scheduled", "Scheduled", "Live"]
+
+
+def test_select_leagues_matches_loosely_and_reports_misses():
+    ms = SW._parse_matches(_daily_feed())
+    found, missing = SW.select_leagues(
+        ["England Premier League", "Framce: Ligue 1", "GERMANY: Bundesliga", "premier league", ""], ms)
+    assert found["England Premier League"] == "ENGLAND: Premier League"
+    assert found["Framce: Ligue 1"] == "FRANCE: Ligue 1"           # one misspelt token tolerated
+    assert found["premier league"] == "ENGLAND: Premier League"    # fewest extra tokens wins
+    assert missing == ["GERMANY: Bundesliga"]
+
+
+def test_history_before_excludes_fixture_and_later_matches():
+    ms = SW._parse_matches(_results_html(), "MBUGcjb9")
+    fixture = next(m for m in ms if m.id == "nHJfzC2N")
+    hist = SW.history_before(ms, fixture)
+    assert [m.id for m in hist] == ["YZz3PZW7", "hdZnTHXr"]
+    # a finished match must not count as its own history
+    own = next(m for m in ms if m.id == "YZz3PZW7")
+    assert [m.id for m in SW.history_before(ms, own)] == ["hdZnTHXr"]
+
+
+def test_pipeline_cache_returns_same_object_within_ttl():
+    import pipeline as P
+    P.clear_cache()
+    calls = []
+    v1 = P._cached(("k",), 60, lambda: calls.append(1) or {"x": 1})
+    v2 = P._cached(("k",), 60, lambda: calls.append(1) or {"x": 2})
+    assert v1 is v2 and calls == [1]
+    P.clear_cache()
 
 
 # --------------------------------------------------------------------------- #
@@ -269,6 +323,26 @@ def test_app_end_to_end_without_matplotlib(monkeypatch):
     assert "Groningen" in at.title[0].value and "Twente" in at.title[0].value
     assert any("Insights" in h.value for h in at.subheader)
     assert len(at.metric) >= 5
+
+
+@live
+def test_league_day_page_runs_for_premier_league():
+    """Second page: pick one league for today, run it, expect a table and expanders."""
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_file("app.py", default_timeout=600)
+    at.run()
+    at.switch_page("views/league_day.py")
+    at.run()
+    at.text_area[0].set_value("ENGLAND: Premier League").run()
+    at.button[0].click().run()
+    assert not at.exception, at.exception
+    body = "\n".join(t.value for t in at.markdown) + "\n".join(c.value for c in at.caption)
+    if "No matches found" in body:
+        pytest.skip("no Premier League matches today")
+    assert at.dataframe, "summary table missing"
+    assert at.expander, "per-match expanders missing"
+    assert any("matches predicted" in c.value for c in at.caption)
 
 
 @live

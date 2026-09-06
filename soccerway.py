@@ -65,6 +65,12 @@ class Match:
     home_score: Optional[int] = None
     away_score: Optional[int] = None
     stage: str = ""                     # AB code: 1 scheduled, 2 live, 3 finished
+    home_slug: str = ""
+    away_slug: str = ""
+
+    @property
+    def status(self) -> str:
+        return {"1": "Scheduled", "2": "Live", "3": "Finished"}.get(self.stage, "Other")
 
     @property
     def finished(self) -> bool:
@@ -163,15 +169,16 @@ def parse_feed(text: str) -> list[dict]:
 # --------------------------------------------------------------------------- #
 # Team results / fixtures (embedded in the team page)
 # --------------------------------------------------------------------------- #
-def _matches_from_html(html: str, team_id: str) -> list[Match]:
+def _parse_matches(text: str, team_id: Optional[str] = None) -> list[Match]:
+    """Matches from any feed text; optionally only those involving ``team_id``."""
     out: list[Match] = []
     competition = ""
-    for rec in parse_feed(html):
+    for rec in parse_feed(text):
         if "ZA" in rec:
             competition = rec["ZA"]
         if "AA" not in rec or "PX" not in rec or "PY" not in rec:
             continue
-        if team_id not in (rec["PX"], rec["PY"]):
+        if team_id and team_id not in (rec["PX"], rec["PY"]):
             continue
         try:
             kickoff = datetime.fromtimestamp(int(rec["AD"]), tz=timezone.utc)
@@ -188,6 +195,7 @@ def _matches_from_html(html: str, team_id: str) -> list[Match]:
             away_id=rec["PY"], away_name=clean_name(rec.get("AF", "")),
             home_score=_int("AG"), away_score=_int("AH"),
             stage=rec.get("AB", ""),
+            home_slug=rec.get("WU", ""), away_slug=rec.get("WV", ""),
         ))
     # de-duplicate (the page can embed the same match twice)
     seen, uniq = set(), []
@@ -201,7 +209,7 @@ def _matches_from_html(html: str, team_id: str) -> list[Match]:
 def team_results(slug: str, team_id: str) -> list[Match]:
     """Finished matches, most recent first."""
     html = _get(f"{SITE}/team/{slug}/{team_id}/results/").text
-    ms = [m for m in _matches_from_html(html, team_id) if m.finished]
+    ms = [m for m in _parse_matches(html, team_id) if m.finished]
     ms.sort(key=lambda m: m.kickoff, reverse=True)
     return ms
 
@@ -209,7 +217,7 @@ def team_results(slug: str, team_id: str) -> list[Match]:
 def team_fixtures(slug: str, team_id: str) -> list[Match]:
     """Upcoming (or in-play) matches, soonest first."""
     html = _get(f"{SITE}/team/{slug}/{team_id}/fixtures/").text
-    ms = [m for m in _matches_from_html(html, team_id) if not m.finished]
+    ms = [m for m in _parse_matches(html, team_id) if not m.finished]
     ms.sort(key=lambda m: m.kickoff)
     return ms
 
@@ -220,6 +228,72 @@ def find_fixture(slug_a: str, id_a: str, id_b: str) -> Optional[Match]:
         if id_b in (m.home_id, m.away_id):
             return m
     return None
+
+
+def history_before(matches: list[Match], fixture: Match) -> list[Match]:
+    """Finished matches that kicked off before ``fixture`` (so a finished or
+    live fixture never counts as its own form)."""
+    return [m for m in matches if m.finished and m.id != fixture.id and m.kickoff < fixture.kickoff]
+
+
+# --------------------------------------------------------------------------- #
+# All matches of a day, grouped by league
+# --------------------------------------------------------------------------- #
+def daily_matches(day_offset: int = 0, tz_hours: int = 0) -> list[Match]:
+    """Every football match on the day ``day_offset`` days from today.
+
+    ``tz_hours`` is the UTC offset used to decide which matches belong to the
+    day (the site passes the viewer's zone). Matches carry the league name in
+    ``competition``.
+    """
+    if not -7 <= day_offset <= 7:
+        raise SoccerwayError("The daily feed only covers a week either side of today.")
+    text = _get(f"{FEED_HOST}/f_1_{day_offset}_{tz_hours}_en-us_1").text
+    return _parse_matches(text)
+
+
+_LEAGUE_NOISE = re.compile(r"[^a-z0-9]+")
+
+
+def normalise_league(name: str) -> str:
+    """'ENGLAND: Premier League' -> 'england premier league'; also strips
+    accents-free punctuation so 'Framce Ligue 1' still nearly matches."""
+    return _LEAGUE_NOISE.sub(" ", name.lower()).strip()
+
+
+def _tokens(name: str) -> set[str]:
+    return set(normalise_league(name).split())
+
+
+def select_leagues(queries: list[str], matches: list[Match]) -> tuple[dict[str, str], list[str]]:
+    """Match user-typed league lines against the competitions present.
+
+    Returns ({query: competition}, [unmatched queries]). A query matches when
+    every one of its tokens appears in the competition name (so 'Premier
+    League' alone would match several; the country disambiguates) - the
+    competition with the fewest extra tokens wins.
+    """
+    comps = sorted({m.competition for m in matches if m.competition})
+    comp_tokens = {c: _tokens(c) for c in comps}
+    found, missing = {}, []
+    for q in queries:
+        q = q.strip()
+        if not q:
+            continue
+        qt = _tokens(q)
+        if not qt:
+            continue
+        candidates = [(len(comp_tokens[c] - qt), c) for c in comps if qt <= comp_tokens[c]]
+        if not candidates:
+            # fuzzy fallback: allow one misspelt token (e.g. 'Framce')
+            candidates = [(len(comp_tokens[c] ^ qt), c) for c in comps
+                          if len(qt & comp_tokens[c]) >= max(1, len(qt) - 1) and len(qt) >= 2]
+            candidates = [t for t in candidates if t[0] <= 2]
+        if candidates:
+            found[q] = min(candidates)[1]
+        else:
+            missing.append(q)
+    return found, missing
 
 
 # --------------------------------------------------------------------------- #

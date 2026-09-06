@@ -25,6 +25,24 @@ The team id is the 8-character code in the link (`.../team/groningen/MBUGcjb9/`)
 Soccerway and Flashscore share team ids, so a Flashscore team link
 (`https://www.flashscore.com/team/groningen/MBUGcjb9/`) works too.
 
+## Two pages
+
+* **Two teams** (`views/two_teams.py`): paste two team links, get the prediction for their
+  next meeting with the full breakdown.
+* **League day** (`views/league_day.py`): paste league names one per line in Flashscore's
+  wording (`ENGLAND: Premier League`), pick the day, and the app predicts every match of that
+  day in those leagues. Output is a summary table (CSV download) plus one expander per match
+  with the same breakdown as the two-team page. Only matches played *before* each fixture
+  count as its history, so finished matches are predicted pre-match and shown against the
+  actual score. Budget about 10 seconds per match; both teams are fetched in parallel and
+  team data is cached for ten minutes, so re-runs are fast.
+
+The daily match list comes from `global.flashscore.ninja/2035/x/feed/f_1_<day offset>_<utc offset>_en-us_1`,
+which carries every match of the day with league headers and team ids.
+
+Shared code: `pipeline.py` (fetching, caching, the analysis object) and `ui.py` (rendering).
+`app.py` is the entry point with `st.navigation`.
+
 ## How the prediction works
 
 1. Attack rate = 70% xG-for + 30% goals-for per game over the last N matches (default 8,
