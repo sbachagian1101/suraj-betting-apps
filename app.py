@@ -309,9 +309,10 @@ with st.expander("Scoreline probabilities"):
     c1, c2 = st.columns([1, 2])
     with c1:
         st.markdown("**Top scorelines**")
-        st.dataframe(pd.DataFrame(pred.top_scores, columns=["Score", "Prob"]),
-                     hide_index=True, width="stretch",
-                     column_config={"Prob": st.column_config.NumberColumn(format="%.1%")})
+        top_df = pd.DataFrame([(s, round(p * 100, 1)) for s, p in pred.top_scores],
+                              columns=["Score", "Prob %"])
+        st.dataframe(top_df, hide_index=True, width="stretch",
+                     column_config={"Prob %": st.column_config.NumberColumn(format="%.1f%%")})
         st.metric("Over 2.5 goals", pct(pred.p_over25))
         st.metric("Both teams score", pct(pred.p_btts))
     with c2:
