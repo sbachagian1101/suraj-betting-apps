@@ -179,9 +179,14 @@ with st.sidebar:
     st.title("⚽ Soccerway Predictor")
     st.caption("Paste the two Soccerway team pages. The app reads each side's last N "
                "matches, finds their fixture, and predicts it from today's line-up.")
-    url_a = st.text_input("Team A link", value=EXAMPLE_A)
+    url_a = st.text_input("Team A link", value=EXAMPLE_A,
+                          help="Soccerway or Flashscore team page; both share the same team ids.")
     url_b = st.text_input("Team B link", value=EXAMPLE_B)
-    n = st.slider("Matches to use", 1, 10, 3)
+    n_rates = st.slider("Matches for xG / goals rates", 1, 15, M.N_RATES,
+                        help="Recency-weighted: each older match counts "
+                             f"{M.DECAY:.0%} of the one before it.")
+    n_lineup = st.slider("Matches for player ratings / line-up", 1, 10, M.N_LINEUP,
+                         help="Shorter window: who is in form changes faster than team strength.")
     manual_home = st.radio("If no fixture is listed, home team is", ["Team A", "Team B"],
                            horizontal=True)
     go = st.button("Analyse", type="primary", width="stretch")
@@ -202,9 +207,10 @@ if not go and "result" not in st.session_state:
 # --------------------------------------------------------------------------- #
 if go:
     status = st.status("Fetching Soccerway data…", expanded=True)
+    n_fetch = max(n_rates, n_lineup)
     try:
-        slug_a, id_a, name_a, recs_a = load_team(url_a, n, status.write)
-        slug_b, id_b, name_b, recs_b = load_team(url_b, n, status.write)
+        slug_a, id_a, name_a, recs_a = load_team(url_a, n_fetch, status.write)
+        slug_b, id_b, name_b, recs_b = load_team(url_b, n_fetch, status.write)
         if id_a == id_b:
             raise SW.SoccerwayError("Both links point to the same team.")
         status.write("Looking for the fixture between them…")
@@ -228,8 +234,8 @@ if go:
         home = (id_b, name_b, recs_b)
         away = (id_a, name_a, recs_a)
 
-    prof_h = M.profile(home[1], home[2])
-    prof_a = M.profile(away[1], away[2])
+    prof_h = M.profile(home[1], home[2], n_rates, n_lineup)
+    prof_a = M.profile(away[1], away[2], n_rates, n_lineup)
 
     def _assess(records, side, prof):
         tl = live.get(side) if live else None
@@ -243,7 +249,8 @@ if go:
     la_a = _assess(away[2], "AWAY", prof_a)
     pred = M.predict(prof_h, prof_a, la_h, la_a)
     st.session_state["result"] = dict(fixture=fixture, prof_h=prof_h, prof_a=prof_a,
-                                      la_h=la_h, la_a=la_a, pred=pred, odds=odds, n=n)
+                                      la_h=la_h, la_a=la_a, pred=pred, odds=odds,
+                                      n=n_rates, n_lineup=n_lineup)
 
 R = st.session_state["result"]
 fixture, prof_h, prof_a, la_h, la_a, pred, odds = (
@@ -333,8 +340,13 @@ with st.expander("How the prediction is built"):
     st.markdown(f"""
 * **Attack rate** = {M.XG_WEIGHT:.0%} xG-for + {1 - M.XG_WEIGHT:.0%} goals-for per game over the
   last {R['n']} matches; **defence rate** likewise from xGA and goals-against.
+  Matches are **recency-weighted**: match *k* back counts {M.DECAY}^k, so the newest match
+  has weight 1 and the {R['n']}th has {M.DECAY ** (R['n'] - 1):.2f}
+  (effective sample {prof_h.n_eff:.1f} games).
 * Both rates are shrunk toward a league average of {M.LEAGUE_AVG} goals with a prior weight of
-  {M.PRIOR_GAMES:g} games, because {R['n']} matches is a small sample.
+  {M.PRIOR_GAMES:g} games, against that effective sample size.
+* **Player ratings and the line-up comparison use a shorter window** of the last {R['n_lineup']}
+  matches, because who is in form changes faster than a team's underlying strength.
 * Expected goals: home = attack × opponent defence ÷ average × {M.HOME_ADV};
   away likewise × {M.AWAY_ADV}.
 * **Line-up adjustment**: each starter's average Soccerway rating over those matches is compared

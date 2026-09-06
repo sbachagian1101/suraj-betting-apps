@@ -2,10 +2,13 @@
 
 Design notes (kept deliberately simple and transparent):
 
-* Attack rate  = blend of xG-for and goals-for over the last N matches.
-* Defence rate = blend of xG-against and goals-against over the last N.
-* Both are shrunk toward a league-average rate because N is tiny (3 by
-  default). With N=3 and PRIOR_GAMES=2 the sample carries 60% of the weight.
+* Attack rate  = blend of xG-for and goals-for over the last N matches,
+  weighted by recency (each older match counts DECAY times the one before).
+* Defence rate = blend of xG-against and goals-against, same weighting.
+* Both are shrunk toward a league-average rate with a prior worth PRIOR_GAMES
+  games, against the *effective* sample size (sum of the recency weights).
+* Line-up ratings use a shorter, separate window (N_LINEUP) because who is in
+  form changes faster than a team's underlying attack and defence.
 * Expected goals for each side follow the usual multiplicative form:
       home = att_home * def_away / AVG * HOME_ADV
       away = att_away * def_home / AVG * AWAY_ADV
@@ -26,6 +29,9 @@ from soccerway import MatchRecord, Player
 
 LEAGUE_AVG = 1.45          # goals per team per game (top-flight Europe)
 PRIOR_GAMES = 2.0          # shrinkage weight in "games"
+DECAY = 0.85               # recency weight: match k back counts DECAY**k
+N_RATES = 8                # default window for xG / goals rates
+N_LINEUP = 4               # default window for player ratings and line-up
 HOME_ADV = 1.12
 AWAY_ADV = 0.90
 XG_WEIGHT = 0.7            # rest is actual goals
@@ -42,33 +48,58 @@ def _mean(xs) -> Optional[float]:
 @dataclass
 class TeamProfile:
     name: str
-    records: list[MatchRecord]
+    records: list[MatchRecord]          # rates window, most recent first
+    lineup_records: list[MatchRecord]   # shorter window for ratings / line-up
     n: int
+    n_lineup: int
+    weights: list[float]                # recency weight per record
+    n_eff: float                        # sum of weights
     form: str
     points: int
     goals_for: float
     goals_against: float
     xg_for: Optional[float]
     xg_against: Optional[float]
-    avg_rating: Optional[float]
+    avg_rating: Optional[float]         # over the line-up window
     attack: float
     defence: float
     xg_games: int                       # matches that actually had xG
 
 
-def _shrink(sample: Optional[float], n: int) -> float:
-    if sample is None or n == 0:
+def recency_weights(n: int, decay: float = DECAY) -> list[float]:
+    return [decay ** k for k in range(n)]
+
+
+def _wmean(values, weights) -> Optional[float]:
+    pairs = [(v, w) for v, w in zip(values, weights) if v is not None]
+    if not pairs:
+        return None
+    return sum(v * w for v, w in pairs) / sum(w for _, w in pairs)
+
+
+def _shrink(sample: Optional[float], n_eff: float) -> float:
+    if sample is None or n_eff <= 0:
         return LEAGUE_AVG
-    return (sample * n + LEAGUE_AVG * PRIOR_GAMES) / (n + PRIOR_GAMES)
+    return (sample * n_eff + LEAGUE_AVG * PRIOR_GAMES) / (n_eff + PRIOR_GAMES)
 
 
-def profile(name: str, records: list[MatchRecord]) -> TeamProfile:
-    n = len(records)
-    gf = _mean(r.goals_for for r in records)
-    ga = _mean(r.goals_against for r in records)
-    xgf = _mean(r.xg_for for r in records)
-    xga = _mean(r.xg_against for r in records)
-    xg_games = sum(1 for r in records if r.xg_for is not None)
+def profile(name: str, records: list[MatchRecord],
+            n_rates: Optional[int] = None, n_lineup: Optional[int] = None) -> TeamProfile:
+    """Build a team profile.
+
+    ``records`` is most-recent-first. The first ``n_rates`` feed the attack and
+    defence rates (recency weighted); the first ``n_lineup`` feed the ratings.
+    """
+    rates = records[:n_rates] if n_rates else records
+    lineup = records[:n_lineup] if n_lineup else rates
+    n = len(rates)
+    w = recency_weights(n)
+    n_eff = sum(w)
+    gf = _wmean((r.goals_for for r in rates), w)
+    ga = _wmean((r.goals_against for r in rates), w)
+    xgf = _wmean((r.xg_for for r in rates), w)
+    xga = _wmean((r.xg_against for r in rates), w)
+    xg_games = sum(1 for r in rates if r.xg_for is not None)
 
     def blend(xg, goals):
         if xg is None and goals is None:
@@ -79,15 +110,16 @@ def profile(name: str, records: list[MatchRecord]) -> TeamProfile:
             return xg
         return XG_WEIGHT * xg + (1 - XG_WEIGHT) * goals
 
-    attack = _shrink(blend(xgf, gf), n)
-    defence = _shrink(blend(xga, ga), n)
-    form = "".join(r.result for r in records)          # most recent first
-    points = sum({"W": 3, "D": 1, "L": 0}[r.result] for r in records)
+    attack = _shrink(blend(xgf, gf), n_eff)
+    defence = _shrink(blend(xga, ga), n_eff)
+    form = "".join(r.result for r in rates)          # most recent first
+    points = sum({"W": 3, "D": 1, "L": 0}[r.result] for r in rates)
     return TeamProfile(
-        name=name, records=records, n=n, form=form, points=points,
+        name=name, records=rates, lineup_records=lineup, n=n, n_lineup=len(lineup),
+        weights=w, n_eff=n_eff, form=form, points=points,
         goals_for=gf or 0.0, goals_against=ga or 0.0,
         xg_for=xgf, xg_against=xga,
-        avg_rating=_mean(r.team_rating for r in records),
+        avg_rating=_mean(r.team_rating for r in lineup),
         attack=attack, defence=defence, xg_games=xg_games,
     )
 
@@ -136,7 +168,7 @@ class LineupAssessment:
 
 def assess_lineup(starters: list[Player], source: str, formation: str,
                   prof: TeamProfile) -> LineupAssessment:
-    hist = player_histories(prof.records)
+    hist = player_histories(prof.lineup_records)
     team_avg = prof.avg_rating
     vals, rows, newcomers = [], [], []
     for p in starters:
@@ -157,7 +189,7 @@ def assess_lineup(starters: list[Player], source: str, formation: str,
     if lineup_rating is not None and team_avg is not None and len(vals) >= 5:
         gap = lineup_rating - team_avg
     starter_ids = {p.id for p in starters}
-    regular_cut = max(1, math.ceil(prof.n / 2))
+    regular_cut = max(1, math.ceil(prof.n_lineup / 2))
     missing = sorted(
         (h for h in hist.values()
          if h.id not in starter_ids and h.starts >= regular_cut),
@@ -248,7 +280,8 @@ def insights(home: TeamProfile, away: TeamProfile, pred: Prediction,
             out.append(f"**{t.name}**: no finished matches found, league-average rates used.")
             return
         out.append(f"**{t.name}** form {t.form} ({t.points} pts from {t.n}), "
-                   f"scoring {t.goals_for:.1f} and conceding {t.goals_against:.1f} per game.")
+                   f"scoring {t.goals_for:.1f} and conceding {t.goals_against:.1f} per game "
+                   f"(recency-weighted, newest match counts most).")
         if t.xg_for is not None:
             diff = t.goals_for - t.xg_for
             if diff > 0.5:
@@ -271,14 +304,14 @@ def insights(home: TeamProfile, away: TeamProfile, pred: Prediction,
             src = "today's confirmed XI" if la.source == "today" else "the last match's XI (today's not published yet)"
             if la.lineup_rating is not None and la.team_recent_rating is not None:
                 out.append(f"{t.name} line-up ({la.formation or '?'}, {src}) averages "
-                           f"{la.lineup_rating:.2f} across the last {t.n} games versus a team "
+                           f"{la.lineup_rating:.2f} across the last {t.n_lineup} games versus a team "
                            f"average of {la.team_recent_rating:.2f} (gap {la.gap:+.2f}).")
             if la.missing:
                 names = ", ".join(f"{h.name} ({h.avg:.1f})" if h.avg else h.name for h in la.missing[:4])
                 out.append(f"{t.name} regulars not starting: {names}.")
             if la.newcomers:
                 names = ", ".join(p.name for p in la.newcomers[:4])
-                out.append(f"{t.name} starters with no rating in the last {t.n} games: {names}.")
+                out.append(f"{t.name} starters with no rating in the last {t.n_lineup} games: {names}.")
 
     team_notes(home, hl, "home")
     team_notes(away, al, "away")

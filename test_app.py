@@ -28,6 +28,12 @@ def test_parse_team_url_variants():
     assert SW.parse_team_url("https://us.soccerway.com/team/twente/dhOKTHGA/results/") == ("twente", "dhOKTHGA")
 
 
+def test_parse_team_url_accepts_flashscore_links():
+    assert SW.parse_team_url("https://www.flashscore.com/team/groningen/MBUGcjb9/") == ("groningen", "MBUGcjb9")
+    assert SW.parse_team_url("https://www.flashscore.co.uk/team/twente/dhOKTHGA/") == ("twente", "dhOKTHGA")
+    assert SW.parse_team_url("https://www.flashscore.com.au/team/twente/dhOKTHGA/results/") == ("twente", "dhOKTHGA")
+
+
 def test_parse_team_url_rejects_junk():
     with pytest.raises(SW.SoccerwayError):
         SW.parse_team_url("https://us.soccerway.com/game/groningen-MBUGcjb9/psv-M9UEHJWi/")
@@ -117,8 +123,10 @@ def test_profile_blends_and_shrinks():
     recs = _records("t", [2.0, 2.0, 2.0], [1.0, 1.0, 1.0], [{"a": 7.0}] * 3)
     p = M.profile("T", recs)
     assert p.form == "WWW" and p.points == 9
+    n_eff = 1 + M.DECAY + M.DECAY ** 2
+    assert p.n_eff == pytest.approx(n_eff)
     blended_att = M.XG_WEIGHT * 2.0 + (1 - M.XG_WEIGHT) * 2.0
-    expected = (blended_att * 3 + M.LEAGUE_AVG * M.PRIOR_GAMES) / (3 + M.PRIOR_GAMES)
+    expected = (blended_att * n_eff + M.LEAGUE_AVG * M.PRIOR_GAMES) / (n_eff + M.PRIOR_GAMES)
     assert p.attack == pytest.approx(expected)
     assert p.xg_games == 3
 
@@ -127,7 +135,39 @@ def test_profile_without_xg_falls_back_to_goals():
     recs = _records("t", [None, None], [None, None], [{"a": 6.0}] * 2)
     p = M.profile("T", recs)
     assert p.xg_for is None and p.xg_games == 0
-    assert p.attack == pytest.approx((2.0 * 2 + M.LEAGUE_AVG * M.PRIOR_GAMES) / (2 + M.PRIOR_GAMES))
+    n_eff = 1 + M.DECAY
+    assert p.attack == pytest.approx((2.0 * n_eff + M.LEAGUE_AVG * M.PRIOR_GAMES) / (n_eff + M.PRIOR_GAMES))
+
+
+def test_recent_matches_weigh_more():
+    # newest match xG 3.0, older ones 1.0: weighted mean must sit above the plain mean
+    recs = _records("t", [3.0, 1.0, 1.0, 1.0], [1.0] * 4, [{"a": 6.5}] * 4)
+    p = M.profile("T", recs)
+    plain = (3.0 + 1.0 + 1.0 + 1.0) / 4
+    assert p.xg_for > plain
+    w = M.recency_weights(4)
+    assert p.xg_for == pytest.approx((3.0 * w[0] + sum(w[1:])) / sum(w))
+    # reversed order (big game oldest) must come out below the plain mean
+    p2 = M.profile("T", _records("t", [1.0, 1.0, 1.0, 3.0], [1.0] * 4, [{"a": 6.5}] * 4))
+    assert p2.xg_for < plain
+
+
+def test_separate_rates_and_lineup_windows():
+    ids = [f"p{i}" for i in range(11)]
+    recent = {pid: 7.5 for pid in ids}
+    old = {pid: 6.0 for pid in ids}
+    recs = _records("t", [1.5] * 6, [1.0] * 6, [recent, recent, old, old, old, old])
+    p = M.profile("T", recs, n_rates=6, n_lineup=2)
+    assert p.n == 6 and p.n_lineup == 2
+    assert p.avg_rating == pytest.approx(7.5)        # only the two recent matches
+    la = M.assess_lineup([_player(pid, None) for pid in ids], "today", "4-3-3", p)
+    assert la.rows[0]["Starts (last N)"] == 2
+    assert la.lineup_rating == pytest.approx(7.5)
+    p_all = M.profile("T", recs, n_rates=6, n_lineup=6)
+    assert p_all.avg_rating == pytest.approx(6.5)
+    # asking for more than exists just uses what there is
+    p_short = M.profile("T", recs, n_rates=15, n_lineup=10)
+    assert p_short.n == 6 and p_short.n_lineup == 6
 
 
 def test_probabilities_sum_to_one_and_home_edge():
@@ -225,7 +265,8 @@ def test_app_end_to_end_without_matplotlib(monkeypatch):
     at.run()
     at.button[0].click().run()
     assert not at.exception, at.exception
-    assert at.title[0].value.startswith("Groningen v")
+    # whichever side hosts the next meeting, both clubs must be in the title
+    assert "Groningen" in at.title[0].value and "Twente" in at.title[0].value
     assert any("Insights" in h.value for h in at.subheader)
     assert len(at.metric) >= 5
 

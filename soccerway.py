@@ -40,7 +40,10 @@ REC_SEP = "~"
 FIELD_SEP = "¬"    # ¬
 KV_SEP = "÷"       # ÷
 
-TEAM_URL_RE = re.compile(r"soccerway\.com/team/([^/?#]+)/([A-Za-z0-9]{8})/?", re.I)
+# Soccerway and Flashscore run on the same engine and share team ids, so a
+# Flashscore team link (any locale) works too; data is always read via Soccerway.
+TEAM_URL_RE = re.compile(
+    r"(?:soccerway|flashscore|livesport|flashscore\w*)\.[a-z.]+/team/([^/?#]+)/([A-Za-z0-9]{8})/?", re.I)
 
 
 class SoccerwayError(RuntimeError):
@@ -129,8 +132,9 @@ def parse_team_url(url: str) -> tuple[str, str]:
     m = TEAM_URL_RE.search(url.strip())
     if not m:
         raise SoccerwayError(
-            "That does not look like a Soccerway team link. Expected something like "
-            "https://us.soccerway.com/team/groningen/MBUGcjb9/")
+            "That does not look like a Soccerway or Flashscore team link. Expected something "
+            "like https://us.soccerway.com/team/groningen/MBUGcjb9/ or "
+            "https://www.flashscore.com/team/groningen/MBUGcjb9/")
     return m.group(1), m.group(2)
 
 

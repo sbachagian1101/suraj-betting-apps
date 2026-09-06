@@ -22,20 +22,27 @@ site's own pages call. No login, no browser automation, no API key.
 
 The team id is the 8-character code in the link (`.../team/groningen/MBUGcjb9/`).
 
+Soccerway and Flashscore share team ids, so a Flashscore team link
+(`https://www.flashscore.com/team/groningen/MBUGcjb9/`) works too.
+
 ## How the prediction works
 
-1. Attack rate = 70% xG-for + 30% goals-for per game over the last N matches.
-   Defence rate the same from xGA and goals-against. Matches without xG use goals only.
+1. Attack rate = 70% xG-for + 30% goals-for per game over the last N matches (default 8,
+   up to 15), **recency-weighted**: match k back counts 0.85^k, so the newest match has
+   weight 1 and the eighth about 0.32. Defence rate the same from xGA and goals-against.
+   Matches without xG use goals only.
 2. Both rates are shrunk toward a league average (1.45 goals) with a prior weight of 2 games,
-   because N=3 is a tiny sample.
-3. Expected goals: `home = att_home x def_away / avg x 1.12`, `away = att_away x def_home / avg x 0.90`.
-4. Line-up adjustment: each of today's starters gets their mean Soccerway rating over the
+   against the effective sample size (sum of the weights).
+3. Player ratings and the line-up comparison use a **shorter window** (default 4 matches,
+   up to 10), because who is in form changes faster than team strength.
+4. Expected goals: `home = att_home x def_away / avg x 1.12`, `away = att_away x def_home / avg x 0.90`.
+5. Line-up adjustment: each of today's starters gets their mean Soccerway rating over the
    last N matches. The gap between the XI's mean and the team's mean rating scales the attack
    by `exp(0.35 x gap)` and the opponent's attack by `exp(-0.20 x gap)`. Starters with no
    recent rating are neutral. Regulars (started at least half the matches) who are not in
    today's XI are listed.
-5. Independent Poisson grid gives 1X2, top scorelines, over 2.5 and both-teams-to-score.
-6. If the fixture has odds, the model's probabilities are shown against the book's implied
+6. Independent Poisson grid gives 1X2, top scorelines, over 2.5 and both-teams-to-score.
+7. If the fixture has odds, the model's probabilities are shown against the book's implied
    probabilities with the margin removed.
 
 Line-ups appear on Soccerway roughly an hour before kick-off. Before that the app uses the
