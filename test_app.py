@@ -1,0 +1,239 @@
+"""Tests for the Soccerway predictor.
+
+Unit tests run offline on captured feed snippets. The two tests marked
+``live`` hit Soccerway and are skipped automatically when offline.
+"""
+from datetime import datetime, timezone
+
+import pytest
+import requests
+
+import model as M
+import soccerway as SW
+
+F = SW.FIELD_SEP
+K = SW.KV_SEP
+
+
+def rec(**kv):
+    return F.join(f"{k}{K}{v}" for k, v in kv.items())
+
+
+# --------------------------------------------------------------------------- #
+# URL parsing and feed parsing
+# --------------------------------------------------------------------------- #
+def test_parse_team_url_variants():
+    assert SW.parse_team_url("https://us.soccerway.com/team/groningen/MBUGcjb9/") == ("groningen", "MBUGcjb9")
+    assert SW.parse_team_url(" www.soccerway.com/team/twente/dhOKTHGA ") == ("twente", "dhOKTHGA")
+    assert SW.parse_team_url("https://us.soccerway.com/team/twente/dhOKTHGA/results/") == ("twente", "dhOKTHGA")
+
+
+def test_parse_team_url_rejects_junk():
+    with pytest.raises(SW.SoccerwayError):
+        SW.parse_team_url("https://us.soccerway.com/game/groningen-MBUGcjb9/psv-M9UEHJWi/")
+
+
+def test_clean_name_strips_country_tag():
+    assert SW.clean_name("Twente (Ned)") == "Twente"
+    assert SW.clean_name("Qarabag (Aze)") == "Qarabag"
+    assert SW.clean_name("G.A. Eagles") == "G.A. Eagles"
+    assert SW.clean_name("Sittard") == "Sittard"
+
+
+def test_parse_feed_splits_records_and_fields():
+    text = "~" + rec(ZA="NETHERLANDS: Eredivisie", ZB="139") + "~" + rec(AA="YZz3PZW7", AG="2", AH="3")
+    recs = SW.parse_feed(text)
+    assert recs[0]["ZA"] == "NETHERLANDS: Eredivisie"
+    assert recs[1] == {"AA": "YZz3PZW7", "AG": "2", "AH": "3"}
+
+
+def _results_html():
+    header = rec(ZA="NETHERLANDS: Eredivisie")
+    m1 = rec(AA="YZz3PZW7", AD="1787940000", AB="3", AE="Groningen", PX="MBUGcjb9",
+             AF="Sittard", PY="YH8HX5iP", AG="2", AH="3")
+    m2 = rec(AA="hdZnTHXr", AD="1787488200", AB="3", AE="PSV", PX="M9UEHJWi",
+             AF="Groningen", PY="MBUGcjb9", AG="5", AH="1")
+    other = rec(AA="zzzzzzzz", AD="1787488200", AB="3", AE="Ajax", PX="aaaaaaaa",
+                AF="Feyenoord", PY="bbbbbbbb", AG="1", AH="1")
+    fixture = rec(AA="nHJfzC2N", AD="1788689700", AB="1", AE="Groningen", PX="MBUGcjb9",
+                  AF="Twente", PY="dhOKTHGA")
+    return "<html>~" + "~".join([header, m1, m2, other, fixture, m1]) + "~</html>"
+
+
+def test_matches_from_html_filters_and_dedupes():
+    ms = SW._matches_from_html(_results_html(), "MBUGcjb9")
+    ids = [m.id for m in ms]
+    assert ids == ["YZz3PZW7", "hdZnTHXr", "nHJfzC2N"]       # other team dropped, duplicate dropped
+    assert all(m.competition == "NETHERLANDS: Eredivisie" for m in ms)
+    m = ms[0]
+    assert m.finished and m.home_score == 2 and m.away_score == 3
+    assert m.kickoff == datetime(2026, 8, 28, 18, 0, tzinfo=timezone.utc)
+    assert m.side_of("MBUGcjb9") == "H" and ms[1].side_of("MBUGcjb9") == "A"
+    fx = ms[2]
+    assert not fx.finished and fx.home_score is None
+
+
+def test_stats_parsing_uses_full_time_section_only(monkeypatch):
+    text = "~".join([
+        rec(SE="Game"), rec(SF="Top stats"),
+        rec(SD="432", SG="Expected goals (xG)", SH="1.92", SI="0.87"),
+        rec(SD="12", SG="Ball possession", SH="68%", SI="32%"),
+        rec(SE="1st Half"),
+        rec(SD="432", SG="Expected goals (xG)", SH="0.50", SI="0.10"),
+    ])
+    monkeypatch.setattr(SW, "_get", lambda url, params=None: type("R", (), {"text": text})())
+    stats = SW.match_stats("x")
+    assert SW.xg_from_stats(stats) == (1.92, 0.87)
+    assert stats["Ball possession"] == (68.0, 32.0)
+
+
+# --------------------------------------------------------------------------- #
+# Model
+# --------------------------------------------------------------------------- #
+def _match(i, home_id, away_id, hs, as_):
+    return SW.Match(id=f"m{i}", kickoff=datetime(2026, 8, i + 1, tzinfo=timezone.utc),
+                    competition="X", home_id=home_id, home_name="H" + home_id,
+                    away_id=away_id, away_name="A" + away_id, home_score=hs, away_score=as_,
+                    stage="3")
+
+
+def _player(pid, rating, starter=True):
+    return SW.Player(id=pid, name=pid.title(), number="1", role="Midfielder", rating=rating, starter=starter)
+
+
+def _records(team, xg_for, xg_against, ratings_by_match):
+    out = []
+    for i, ((xf, xa), ratings) in enumerate(zip(zip(xg_for, xg_against), ratings_by_match)):
+        m = _match(i, team, "opp", 2, 1)
+        starters = [_player(pid, r) for pid, r in ratings.items()]
+        out.append(SW.MatchRecord(match=m, side="H", goals_for=2, goals_against=1,
+                                  xg_for=xf, xg_against=xa,
+                                  team_rating=sum(ratings.values()) / len(ratings),
+                                  formation="4-3-3", starters=starters, opponent_rating=6.5))
+    return out
+
+
+def test_profile_blends_and_shrinks():
+    recs = _records("t", [2.0, 2.0, 2.0], [1.0, 1.0, 1.0], [{"a": 7.0}] * 3)
+    p = M.profile("T", recs)
+    assert p.form == "WWW" and p.points == 9
+    blended_att = M.XG_WEIGHT * 2.0 + (1 - M.XG_WEIGHT) * 2.0
+    expected = (blended_att * 3 + M.LEAGUE_AVG * M.PRIOR_GAMES) / (3 + M.PRIOR_GAMES)
+    assert p.attack == pytest.approx(expected)
+    assert p.xg_games == 3
+
+
+def test_profile_without_xg_falls_back_to_goals():
+    recs = _records("t", [None, None], [None, None], [{"a": 6.0}] * 2)
+    p = M.profile("T", recs)
+    assert p.xg_for is None and p.xg_games == 0
+    assert p.attack == pytest.approx((2.0 * 2 + M.LEAGUE_AVG * M.PRIOR_GAMES) / (2 + M.PRIOR_GAMES))
+
+
+def test_probabilities_sum_to_one_and_home_edge():
+    a = M.profile("A", _records("a", [1.5] * 3, [1.2] * 3, [{"p": 6.8}] * 3))
+    b = M.profile("B", _records("b", [1.5] * 3, [1.2] * 3, [{"p": 6.8}] * 3))
+    pred = M.predict(a, b)
+    assert pred.p_home + pred.p_draw + pred.p_away == pytest.approx(1.0, abs=1e-9)
+    assert pred.p_home > pred.p_away                    # identical teams: home advantage shows
+    assert sum(map(sum, pred.grid)) == pytest.approx(1.0)
+
+
+def test_lineup_gap_moves_expected_goals():
+    ids = [f"p{i}" for i in range(11)]
+    strong = {pid: 7.5 for pid in ids}
+    weak = {pid: 6.0 for pid in ids}
+    recs = _records("a", [1.5] * 3, [1.2] * 3, [strong, strong, weak])
+    prof = M.profile("A", recs)
+    # today's XI = the same players -> gap 0
+    same = M.assess_lineup([_player(pid, None) for pid in ids], "today", "4-3-3", prof)
+    assert same.gap == pytest.approx(0.0, abs=1e-9)
+    assert same.rated == 11 and not same.missing
+    # today's XI = five regulars replaced by unknowns -> five newcomers, five regulars missing
+    mixed = [_player(pid, None) for pid in ids[:6]] + [_player(f"new{i}", None) for i in range(5)]
+    mixed_la = M.assess_lineup(mixed, "today", "4-3-3", prof)
+    assert len(mixed_la.newcomers) == 5 and len(mixed_la.missing) == 5
+    base = M.predict(prof, prof)
+    up = M.assess_lineup([_player(pid, None) for pid in ids], "today", "4-3-3", prof)
+    up.gap = 0.5
+    boosted = M.predict(prof, prof, up, None)
+    assert boosted.exp_home > base.exp_home and boosted.exp_away < base.exp_away
+
+
+def test_implied_removes_overround():
+    imp = M.implied({"home": 3.6, "draw": 4.0, "away": 1.85})
+    assert imp["home"] + imp["draw"] + imp["away"] == pytest.approx(1.0)
+    assert imp["overround"] > 0
+    assert M.implied({"home": 3.6, "draw": None, "away": 1.85}) is None
+
+
+def test_insights_mention_form_and_book():
+    a = M.profile("Alpha", _records("a", [2.5] * 3, [0.8] * 3, [{"p": 7.0}] * 3))
+    b = M.profile("Beta", _records("b", [0.9] * 3, [1.9] * 3, [{"p": 6.2}] * 3))
+    pred = M.predict(a, b)
+    text = "\n".join(M.insights(a, b, pred, None, None, {"home": 2.0, "draw": 3.5, "away": 3.8,
+                                                           "home_open": 2.2, "draw_open": 3.5, "away_open": 3.4}))
+    assert "Alpha" in text and "form WWW" in text
+    assert "Book (bet365)" in text
+    assert "Market movement" in text
+
+
+# --------------------------------------------------------------------------- #
+# Live (skipped offline)
+# --------------------------------------------------------------------------- #
+def _online() -> bool:
+    try:
+        requests.head(SW.SITE, timeout=5)
+        return True
+    except requests.RequestException:
+        return False
+
+
+live = pytest.mark.skipif(not _online(), reason="no network")
+
+
+@live
+def test_live_results_and_stats():
+    ms = SW.team_results("groningen", "MBUGcjb9")
+    assert ms and ms[0].finished
+    stats = SW.match_stats("YZz3PZW7")             # Groningen 2-3 Sittard, 28 Aug 2026
+    assert SW.xg_from_stats(stats) == (1.92, 0.87)
+
+
+@live
+def test_app_end_to_end_without_matplotlib(monkeypatch):
+    """The score grid shading must not need matplotlib (absent on Streamlit Cloud).
+
+    Hide matplotlib and purge pandas' Styler modules so its has_mpl flag is
+    re-evaluated, then run the whole app with Analyse pressed.
+    """
+    import sys
+    from streamlit.testing.v1 import AppTest
+
+    class _Block:
+        def find_spec(self, name, path=None, target=None):
+            if name == "matplotlib" or name.startswith("matplotlib."):
+                raise ImportError("matplotlib hidden for test")
+            return None
+
+    for mod in list(sys.modules):
+        if mod == "matplotlib" or mod.startswith("matplotlib.") or mod.startswith("pandas.io.formats.style"):
+            monkeypatch.delitem(sys.modules, mod, raising=False)
+    monkeypatch.setattr(sys, "meta_path", [_Block()] + sys.meta_path)
+
+    at = AppTest.from_file("app.py", default_timeout=120)
+    at.run()
+    at.button[0].click().run()
+    assert not at.exception, at.exception
+    assert at.title[0].value.startswith("Groningen v")
+    assert any("Insights" in h.value for h in at.subheader)
+    assert len(at.metric) >= 5
+
+
+@live
+def test_live_lineups_have_eleven_rated_starters():
+    lu = SW.match_lineups("YZz3PZW7")
+    assert set(lu) == {"HOME", "AWAY"}
+    home = lu["HOME"]
+    assert home.formation == "4-2-3-1" and len(home.starters) == 11
+    assert all(p.rating is not None for p in home.starters)
