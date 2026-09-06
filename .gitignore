@@ -1,0 +1,4 @@
+__pycache__/
+data/races.jsonl
+data/weights.json
+.streamlit/secrets.toml
