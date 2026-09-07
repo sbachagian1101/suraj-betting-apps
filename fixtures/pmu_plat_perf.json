@@ -1,0 +1,890 @@
+{
+ "allure": "GALOP",
+ "participants": [
+  {
+   "numPmu": 1,
+   "nomCheval": "ON THE ROCK BLOU",
+   "coursesCourues": [
+    {
+     "date": 1787522400000,
+     "timezoneOffset": 7200000,
+     "hippodrome": "DIEPPE",
+     "nomPrix": "PRIX DE L'INCONTOURNABLE BAR PMU ROUXMESNIL (PRIX DES FALAISES)",
+     "discipline": "PLAT",
+     "allocation": 31100,
+     "distance": 1800,
+     "nbParticipants": 7,
+     "tempsDuPremier": 117700,
+     "etatTerrain": "Très souple",
+     "participants": [
+      {
+       "numPmu": 2,
+       "place": {
+        "place": 1,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "JULIAN SCHNABEL",
+       "nomJockey": "M.BARZALONA",
+       "poidsJockey": 57.0,
+       "corde": 4,
+       "distanceAvecPrecedent": null,
+       "itsHim": false,
+       "reductionKilometrique": 65380,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 4,
+       "place": {
+        "place": 2,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "HUNDER THE MOON",
+       "nomJockey": "L.ROUSSEL",
+       "poidsJockey": 55.5,
+       "corde": 7,
+       "distanceAvecPrecedent": {
+        "knownValue": "DEUX_LONGUEURS",
+        "rawValue": "2 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 65550,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 1,
+       "place": {
+        "place": 3,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "GOLDEN RUN",
+       "nomJockey": "C.DEMURO",
+       "poidsJockey": 57.0,
+       "corde": 1,
+       "distanceAvecPrecedent": {
+        "knownValue": "CINQ_LONGUEURS",
+        "rawValue": "5 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 66050,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 3,
+       "place": {
+        "place": 4,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "QUEEN LAGERTHA",
+       "nomJockey": "A.CRASTUS",
+       "poidsJockey": 55.5,
+       "corde": 3,
+       "distanceAvecPrecedent": {
+        "knownValue": "UNE_LONGUEUR",
+        "rawValue": "1 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 66160,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 7,
+       "place": {
+        "place": 5,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "PICCOLO ANGELO",
+       "nomJockey": "T.TRULLIER",
+       "poidsJockey": 54.5,
+       "corde": 5,
+       "distanceAvecPrecedent": {
+        "knownValue": "TROIS_QUARTS_DE_LONGUEUR",
+        "rawValue": "3/4 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 66220,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 5,
+       "place": {
+        "place": 7,
+        "rawValue": "DP",
+        "statusArrivee": "NON_PLACE"
+       },
+       "nomCheval": "ON THE ROCK BLOU",
+       "nomJockey": "L.BOISSEAU",
+       "poidsJockey": 54.5,
+       "corde": 2,
+       "distanceAvecPrecedent": {
+        "knownValue": "QUATORZE_LONGUEURS",
+        "rawValue": "14 L"
+       },
+       "itsHim": true,
+       "reductionKilometrique": 68160,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      }
+     ]
+    },
+    {
+     "date": 1785189600000,
+     "timezoneOffset": 7200000,
+     "hippodrome": "COMPIEGNE",
+     "nomPrix": "PERSONNEL DE HARAS - PRIX DE PONDRON",
+     "discipline": "PLAT",
+     "allocation": 23000,
+     "distance": 1400,
+     "nbParticipants": 10,
+     "tempsDuPremier": 85050,
+     "etatTerrain": "Bon souple",
+     "participants": [
+      {
+       "numPmu": 9,
+       "place": {
+        "place": 1,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "ARIA FRESCA",
+       "nomJockey": "C.LECOEUVRE",
+       "poidsJockey": 54.5,
+       "corde": 1,
+       "distanceAvecPrecedent": null,
+       "itsHim": false,
+       "reductionKilometrique": 60750,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 2,
+       "place": {
+        "place": 2,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "DICIAMO",
+       "nomJockey": "C.DEMURO",
+       "poidsJockey": 57.5,
+       "corde": 8,
+       "distanceAvecPrecedent": {
+        "knownValue": "DEUX_LONGUEURS",
+        "rawValue": "2 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 60990,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 7,
+       "place": {
+        "place": 3,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "PINK PALACE",
+       "nomJockey": "M.GUYON",
+       "poidsJockey": 56.0,
+       "corde": 6,
+       "distanceAvecPrecedent": {
+        "knownValue": "INCONNU",
+        "rawValue": "Tête"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 61000,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 3,
+       "place": {
+        "place": 4,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "GOLDEN RUN",
+       "nomJockey": "A.MADAMET",
+       "poidsJockey": 57.5,
+       "corde": 9,
+       "distanceAvecPrecedent": {
+        "knownValue": "INCONNU",
+        "rawValue": "Tête"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 61020,
+       "distanceParcourue": null,
+       "oeillere": "OEILLERES_AUSTRALIENNES"
+      },
+      {
+       "numPmu": 5,
+       "place": {
+        "place": 5,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "GOOD BOY",
+       "nomJockey": "L.BRECHET",
+       "poidsJockey": 57.5,
+       "corde": 5,
+       "distanceAvecPrecedent": {
+        "knownValue": "TROIS_QUARTS_DE_LONGUEUR",
+        "rawValue": "3/4 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 61130,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 8,
+       "place": {
+        "place": null,
+        "rawValue": "AR",
+        "statusArrivee": "ARRETE"
+       },
+       "nomCheval": "ON THE ROCK BLOU",
+       "nomJockey": "P.REMOUE",
+       "poidsJockey": 55.0,
+       "corde": 2,
+       "distanceAvecPrecedent": null,
+       "itsHim": true,
+       "reductionKilometrique": null,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "numPmu": 2,
+   "nomCheval": "SILENT DESTINY",
+   "coursesCourues": [
+    {
+     "date": 1786312800000,
+     "timezoneOffset": 7200000,
+     "hippodrome": "DEAUVILLE-CLAIREFONTAINE",
+     "nomPrix": "PRIX DES MEILLEURS RAPPORTS GENYBET (PRIX DU HAUT BOIS)",
+     "discipline": "PLAT",
+     "allocation": 27400,
+     "distance": 1800,
+     "nbParticipants": 12,
+     "tempsDuPremier": 111300,
+     "etatTerrain": "Bon souple",
+     "participants": [
+      {
+       "numPmu": 1,
+       "place": {
+        "place": 1,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "BOULDER",
+       "nomJockey": "M.FAVRIAUX",
+       "poidsJockey": 58.0,
+       "corde": 10,
+       "distanceAvecPrecedent": null,
+       "itsHim": false,
+       "reductionKilometrique": 61830,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 2,
+       "place": {
+        "place": 2,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "WANAKA",
+       "nomJockey": "A.HAMELIN",
+       "poidsJockey": 58.0,
+       "corde": 4,
+       "distanceAvecPrecedent": {
+        "knownValue": "DEUX_LONGUEURS",
+        "rawValue": "2 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 62050,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 10,
+       "place": {
+        "place": 3,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "AROK ATAO",
+       "nomJockey": "M.GUYON",
+       "poidsJockey": 56.0,
+       "corde": 5,
+       "distanceAvecPrecedent": {
+        "knownValue": "UN_QUART_DE_LONGUEUR",
+        "rawValue": "1/4 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 62050,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 8,
+       "place": {
+        "place": 4,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "SILENT DESTINY",
+       "nomJockey": "PC.BOUDOT",
+       "poidsJockey": 56.0,
+       "corde": 3,
+       "distanceAvecPrecedent": {
+        "knownValue": "TROIS_LONGUEURS",
+        "rawValue": "3 L"
+       },
+       "itsHim": true,
+       "reductionKilometrique": 62330,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 11,
+       "place": {
+        "place": 5,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "SCRIBE OF WISDOM",
+       "nomJockey": "M.BARZALONA",
+       "poidsJockey": 56.0,
+       "corde": 9,
+       "distanceAvecPrecedent": {
+        "knownValue": "UNE_LONGUEUR_ET_QUART",
+        "rawValue": "1 L 1/4"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 62440,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "numPmu": 3,
+   "nomCheval": "SHAZAL",
+   "coursesCourues": [
+    {
+     "date": 1787004000000,
+     "timezoneOffset": 7200000,
+     "hippodrome": "SAINT MALO",
+     "nomPrix": "PRIX VINCENT DE GOURNAY",
+     "discipline": "PLAT",
+     "allocation": 21000,
+     "distance": 1800,
+     "nbParticipants": 9,
+     "tempsDuPremier": 118750,
+     "etatTerrain": "Souple",
+     "participants": [
+      {
+       "numPmu": 2,
+       "place": {
+        "place": 1,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "GOLDEN RUN",
+       "nomJockey": "A.MADAMET",
+       "poidsJockey": 58.0,
+       "corde": 7,
+       "distanceAvecPrecedent": null,
+       "itsHim": false,
+       "reductionKilometrique": 65970,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 7,
+       "place": {
+        "place": 2,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "SHAZAL",
+       "nomJockey": "L.BRECHET",
+       "poidsJockey": 56.0,
+       "corde": 9,
+       "distanceAvecPrecedent": {
+        "knownValue": "UNE_LONGUEUR",
+        "rawValue": "1 L"
+       },
+       "itsHim": true,
+       "reductionKilometrique": 66030,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 3,
+       "place": {
+        "place": 3,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "JAMINUS",
+       "nomJockey": "H.LEBOUC",
+       "poidsJockey": 58.0,
+       "corde": 3,
+       "distanceAvecPrecedent": {
+        "knownValue": "UNE_LONGUEUR_TROIS_QUARTS",
+        "rawValue": "1 L 3/4"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 66150,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 9,
+       "place": {
+        "place": 4,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "DILJIT",
+       "nomJockey": "L.ROUSSEL",
+       "poidsJockey": 56.0,
+       "corde": 2,
+       "distanceAvecPrecedent": {
+        "knownValue": "INCONNU",
+        "rawValue": "Tête"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 66160,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 4,
+       "place": {
+        "place": 5,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "GADZART",
+       "nomJockey": "M.PROTTI",
+       "poidsJockey": 58.0,
+       "corde": 6,
+       "distanceAvecPrecedent": {
+        "knownValue": "TROIS_LONGUEURS_ET_DEMIE",
+        "rawValue": "3 L 1/2"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 66400,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "numPmu": 4,
+   "nomCheval": "AROK ATAO",
+   "coursesCourues": [
+    {
+     "date": 1786312800000,
+     "timezoneOffset": 7200000,
+     "hippodrome": "DEAUVILLE-CLAIREFONTAINE",
+     "nomPrix": "PRIX DES MEILLEURS RAPPORTS GENYBET (PRIX DU HAUT BOIS)",
+     "discipline": "PLAT",
+     "allocation": 27400,
+     "distance": 1800,
+     "nbParticipants": 12,
+     "tempsDuPremier": 111300,
+     "etatTerrain": "Bon souple",
+     "participants": [
+      {
+       "numPmu": 1,
+       "place": {
+        "place": 1,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "BOULDER",
+       "nomJockey": "M.FAVRIAUX",
+       "poidsJockey": 58.0,
+       "corde": 10,
+       "distanceAvecPrecedent": null,
+       "itsHim": false,
+       "reductionKilometrique": 61830,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 2,
+       "place": {
+        "place": 2,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "WANAKA",
+       "nomJockey": "A.HAMELIN",
+       "poidsJockey": 58.0,
+       "corde": 4,
+       "distanceAvecPrecedent": {
+        "knownValue": "DEUX_LONGUEURS",
+        "rawValue": "2 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 62050,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 10,
+       "place": {
+        "place": 3,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "AROK ATAO",
+       "nomJockey": "M.GUYON",
+       "poidsJockey": 56.0,
+       "corde": 5,
+       "distanceAvecPrecedent": {
+        "knownValue": "UN_QUART_DE_LONGUEUR",
+        "rawValue": "1/4 L"
+       },
+       "itsHim": true,
+       "reductionKilometrique": 62050,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 8,
+       "place": {
+        "place": 4,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "SILENT DESTINY",
+       "nomJockey": "PC.BOUDOT",
+       "poidsJockey": 56.0,
+       "corde": 3,
+       "distanceAvecPrecedent": {
+        "knownValue": "TROIS_LONGUEURS",
+        "rawValue": "3 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 62330,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 11,
+       "place": {
+        "place": 5,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "SCRIBE OF WISDOM",
+       "nomJockey": "M.BARZALONA",
+       "poidsJockey": 56.0,
+       "corde": 9,
+       "distanceAvecPrecedent": {
+        "knownValue": "UNE_LONGUEUR_ET_QUART",
+        "rawValue": "1 L 1/4"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 62440,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "numPmu": 5,
+   "nomCheval": "CONFLUENT",
+   "coursesCourues": [
+    {
+     "date": 1787004000000,
+     "timezoneOffset": 7200000,
+     "hippodrome": "SAINT MALO",
+     "nomPrix": "PRIX VINCENT DE GOURNAY",
+     "discipline": "PLAT",
+     "allocation": 21000,
+     "distance": 1800,
+     "nbParticipants": 9,
+     "tempsDuPremier": 118750,
+     "etatTerrain": "Souple",
+     "participants": [
+      {
+       "numPmu": 2,
+       "place": {
+        "place": 1,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "GOLDEN RUN",
+       "nomJockey": "A.MADAMET",
+       "poidsJockey": 58.0,
+       "corde": 7,
+       "distanceAvecPrecedent": null,
+       "itsHim": false,
+       "reductionKilometrique": 65970,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 7,
+       "place": {
+        "place": 2,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "SHAZAL",
+       "nomJockey": "L.BRECHET",
+       "poidsJockey": 56.0,
+       "corde": 9,
+       "distanceAvecPrecedent": {
+        "knownValue": "UNE_LONGUEUR",
+        "rawValue": "1 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 66030,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 3,
+       "place": {
+        "place": 3,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "JAMINUS",
+       "nomJockey": "H.LEBOUC",
+       "poidsJockey": 58.0,
+       "corde": 3,
+       "distanceAvecPrecedent": {
+        "knownValue": "UNE_LONGUEUR_TROIS_QUARTS",
+        "rawValue": "1 L 3/4"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 66150,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 9,
+       "place": {
+        "place": 4,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "DILJIT",
+       "nomJockey": "L.ROUSSEL",
+       "poidsJockey": 56.0,
+       "corde": 2,
+       "distanceAvecPrecedent": {
+        "knownValue": "INCONNU",
+        "rawValue": "Tête"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 66160,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 4,
+       "place": {
+        "place": 5,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "GADZART",
+       "nomJockey": "M.PROTTI",
+       "poidsJockey": 58.0,
+       "corde": 6,
+       "distanceAvecPrecedent": {
+        "knownValue": "TROIS_LONGUEURS_ET_DEMIE",
+        "rawValue": "3 L 1/2"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 66400,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 8,
+       "place": {
+        "place": 7,
+        "rawValue": "DP",
+        "statusArrivee": "NON_PLACE"
+       },
+       "nomCheval": "CONFLUENT",
+       "nomJockey": "E.VERHESTRAETEN",
+       "poidsJockey": 56.0,
+       "corde": 8,
+       "distanceAvecPrecedent": {
+        "knownValue": "UNE_LONGUEUR",
+        "rawValue": "1 L"
+       },
+       "itsHim": true,
+       "reductionKilometrique": 66500,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "numPmu": 6,
+   "nomCheval": "SCRIBE OF WISDOM",
+   "coursesCourues": [
+    {
+     "date": 1786312800000,
+     "timezoneOffset": 7200000,
+     "hippodrome": "DEAUVILLE-CLAIREFONTAINE",
+     "nomPrix": "PRIX DES MEILLEURS RAPPORTS GENYBET (PRIX DU HAUT BOIS)",
+     "discipline": "PLAT",
+     "allocation": 27400,
+     "distance": 1800,
+     "nbParticipants": 12,
+     "tempsDuPremier": 111300,
+     "etatTerrain": "Bon souple",
+     "participants": [
+      {
+       "numPmu": 1,
+       "place": {
+        "place": 1,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "BOULDER",
+       "nomJockey": "M.FAVRIAUX",
+       "poidsJockey": 58.0,
+       "corde": 10,
+       "distanceAvecPrecedent": null,
+       "itsHim": false,
+       "reductionKilometrique": 61830,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 2,
+       "place": {
+        "place": 2,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "WANAKA",
+       "nomJockey": "A.HAMELIN",
+       "poidsJockey": 58.0,
+       "corde": 4,
+       "distanceAvecPrecedent": {
+        "knownValue": "DEUX_LONGUEURS",
+        "rawValue": "2 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 62050,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 10,
+       "place": {
+        "place": 3,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "AROK ATAO",
+       "nomJockey": "M.GUYON",
+       "poidsJockey": 56.0,
+       "corde": 5,
+       "distanceAvecPrecedent": {
+        "knownValue": "UN_QUART_DE_LONGUEUR",
+        "rawValue": "1/4 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 62050,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 8,
+       "place": {
+        "place": 4,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "SILENT DESTINY",
+       "nomJockey": "PC.BOUDOT",
+       "poidsJockey": 56.0,
+       "corde": 3,
+       "distanceAvecPrecedent": {
+        "knownValue": "TROIS_LONGUEURS",
+        "rawValue": "3 L"
+       },
+       "itsHim": false,
+       "reductionKilometrique": 62330,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      },
+      {
+       "numPmu": 11,
+       "place": {
+        "place": 5,
+        "rawValue": "DP",
+        "statusArrivee": "PLACE"
+       },
+       "nomCheval": "SCRIBE OF WISDOM",
+       "nomJockey": "M.BARZALONA",
+       "poidsJockey": 56.0,
+       "corde": 9,
+       "distanceAvecPrecedent": {
+        "knownValue": "UNE_LONGUEUR_ET_QUART",
+        "rawValue": "1 L 1/4"
+       },
+       "itsHim": true,
+       "reductionKilometrique": 62440,
+       "distanceParcourue": null,
+       "oeillere": "SANS_OEILLERES"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "numPmu": 7,
+   "nomCheval": "BLACK ECHO TAKE",
+   "coursesCourues": []
+  },
+  {
+   "numPmu": 8,
+   "nomCheval": "ZADOK",
+   "coursesCourues": []
+  },
+  {
+   "numPmu": 9,
+   "nomCheval": "MAITRE ABSOLU",
+   "coursesCourues": []
+  }
+ ]
+}

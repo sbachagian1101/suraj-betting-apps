@@ -1,0 +1,3040 @@
+{
+ "race_summary": {
+  "meeting_summary_reference": {
+   "id": 121228,
+   "external_reference": []
+  },
+  "race_summary_reference": {
+   "id": 937070,
+   "external_reference": []
+  },
+  "name": "Matchbook Signup - Get 20% Back On Loses Apprentice Handicap",
+  "course_name": "Windsor",
+  "course_shortcode": "WDR",
+  "course_surface": {
+   "surface": "TURF"
+  },
+  "age": "3YO plus",
+  "race_class": "5",
+  "distance": "6f 12y",
+  "date": "2026-09-07",
+  "time": "13:12",
+  "ride_count": 15,
+  "race_stage": "DORMANT",
+  "has_video": false,
+  "has_handicap": true,
+  "verdict": "<p><b>ARNAZ</b> wasn't seen to ideal effect but still emerged with a lot of credit when sixth in a big field at Brighton last time and can quickly bounce back to winning ways here to bag a third success of 2026. <b>Good Earth</b> has slipped to his last winning mark and heads the list of dangers, while Yes Walim, <b>Stock Market</b> and <b>Lahina Bay</b> also need factoring into this very open handicap. </p><ol><li><b>ARNAZ</b></li><li><b>GOOD EARTH (IRE)</b></li><li><b>YES WALIIM (IRE)</b></li></ol>",
+  "hidden": false
+ },
+ "prizes": {
+  "prize": [
+   {
+    "position": 1,
+    "prize": "4397.0 GBP"
+   },
+   {
+    "position": 2,
+    "prize": "2063.0 GBP"
+   },
+   {
+    "position": 3,
+    "prize": "1031.0 GBP"
+   },
+   {
+    "position": 4,
+    "prize": "516.0 GBP"
+   },
+   {
+    "position": 5,
+    "prize": "257.0 GBP"
+   }
+  ]
+ },
+ "betting_forecast": "Yes Waliim (4/1), Lahina Bay (5/1), Come On Eibhlin (13/2), Arnaz (7/1), Havana Halo (7/1), Stock Market (8/1), Noelies Dream (10/1), Good Earth (10/1), Rebel Path (10/1), Monsieur Patat (14/1), Rory's Royale (16/1), Jimmy Knocker (16/1), Distant Rumble (16/1), Zoulu Warrior (25/1), Punchbowl Flyer (25/1)",
+ "rides": [
+  {
+   "ride_reference": {
+    "id": 253058764,
+    "external_reference": []
+   },
+   "cloth_number": 10,
+   "draw_number": 4,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 1202655,
+     "external_reference": []
+    },
+    "name": "Rory's Royale",
+    "slug": "rory-s-royale/1202655",
+    "last_ran_days": 191,
+    "age": 4,
+    "foaled": "2022-04-20",
+    "sex": {
+     "type": "g"
+    },
+    "formsummary": {
+     "display_text": "8530-46"
+    },
+    "previous_results": [
+     {
+      "race_id": 905610,
+      "date": "2026-02-28",
+      "time": "15:52:00",
+      "course_name": "Lingfield",
+      "course_shortcode": "LIN",
+      "distance": "7f 1y",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 6,
+      "casualty": {},
+      "runner_count": 7,
+      "bha": 65.0,
+      "race_class": "6",
+      "race_name": "Read Meg Nicholls' Blog At betmgm.co.uk Handicap (Div 2)",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "16/1",
+      "ride_description": "Led, headed after 2 furlongs, remained close up, pushed along well over 2f out, faded over 110yds out"
+     },
+     {
+      "race_id": 897044,
+      "date": "2026-01-07",
+      "time": "18:00:00",
+      "course_name": "Kempton",
+      "course_shortcode": "KEM",
+      "distance": "7f",
+      "run_type": "FLAT",
+      "weight": "9-6",
+      "position": 4,
+      "casualty": {},
+      "runner_count": 8,
+      "bha": 67.0,
+      "race_class": "5",
+      "race_name": "Bet 20 Get 20 With Unibet Handicap",
+      "going": "Standard / Slow",
+      "going_shortcode": "STS",
+      "odds": "22/1",
+      "ride_description": "Midfield, waiting for room over 2f out, chased leaders over 1f out, outpaced before final 110yds, soon weakened"
+     },
+     {
+      "race_id": 893238,
+      "date": "2025-12-10",
+      "time": "17:30:00",
+      "course_name": "Kempton",
+      "course_shortcode": "KEM",
+      "distance": "7f",
+      "run_type": "FLAT",
+      "weight": "9-1",
+      "position": 11,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 67.0,
+      "race_class": "5",
+      "race_name": "Kennet Valley & Heros Celebrate Tullius Handicap",
+      "going": "Standard / Slow",
+      "going_shortcode": "STS",
+      "odds": "33/1",
+      "ride_description": "Always towards rear, outpaced over 1f out, weakened towards finish"
+     },
+     {
+      "race_id": 888178,
+      "date": "2025-11-06",
+      "time": "18:45:00",
+      "course_name": "Chelmsford City",
+      "course_shortcode": "CHC",
+      "distance": "7f",
+      "run_type": "FLAT",
+      "weight": "9-7",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 5,
+      "race_class": "5",
+      "race_name": "Betfair Novice Stakes (GBB Race)",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "14/1",
+      "ride_description": "Led and disputed, pushed along and headed over 2f out, chased winner after, kept on same pace inside final furlong, lost 2nd towards finish"
+     },
+     {
+      "race_id": 885591,
+      "date": "2025-10-22",
+      "time": "16:40:00",
+      "course_name": "Kempton",
+      "course_shortcode": "KEM",
+      "distance": "7f",
+      "run_type": "FLAT",
+      "weight": "9-4",
+      "position": 5,
+      "casualty": {},
+      "runner_count": 12,
+      "race_class": "5",
+      "race_name": "Unibet Supports Safer Gambling Novice Stakes (GBB Race)",
+      "going": "Standard / Slow",
+      "going_shortcode": "STS",
+      "odds": "200/1",
+      "ride_description": "Held up in midfield, ridden and headway over 1f out, kept on same pace"
+     },
+     {
+      "race_id": 884190,
+      "date": "2025-10-14",
+      "time": "14:44:00",
+      "course_name": "Leicester",
+      "course_shortcode": "LEI",
+      "distance": "7f",
+      "run_type": "FLAT",
+      "weight": "9-7",
+      "position": 8,
+      "casualty": {},
+      "runner_count": 9,
+      "race_class": "5",
+      "race_name": "British EBF Novice Stakes (GBB Race)",
+      "going": "Good (Good to Soft in places)",
+      "going_shortcode": "GD",
+      "odds": "125/1",
+      "ride_description": "Held up in rear, always outpaced, struggling before halfway, never on terms"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-7",
+   "headgear": [
+    {
+     "symbol": "v",
+     "name": "Visor",
+     "count": 1
+    }
+   ],
+   "official_rating": 63,
+   "jockey_claim": 7.0,
+   "owner": {
+    "name": "Mr Wayne Brackstone, Mr Steve Whitear"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 385,
+     "external_reference": []
+    },
+    "name": "S Hodgson",
+    "slug": "s-hodgson/385"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 35251,
+     "external_reference": []
+    },
+    "name": "Charlie Tucker"
+   },
+   "silk_filename": "20260907wnd141210.png",
+   "previous_silk_filename": "20260228lin155201.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "16/1",
+    "historical_odds": []
+   },
+   "commentary": "Fair maiden handicapper. Not totally disgraced when sixth of 7 in handicap at Lingfield (7f, all-weather) in February. More is needed in a first-time visor after 6 months off though. ",
+   "race_history_stats": [],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058764,
+     "run_count": "6",
+     "win_count": "0",
+     "place_count": "0"
+    }
+   ],
+   "medication": [],
+   "insights": [
+    {
+     "type": "FIRST_TIME_VISOR"
+    }
+   ]
+  },
+  {
+   "ride_reference": {
+    "id": 253058757,
+    "external_reference": []
+   },
+   "cloth_number": 3,
+   "draw_number": 14,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 1135616,
+     "external_reference": []
+    },
+    "name": "Jimmy Knocker",
+    "slug": "jimmy-knocker/1135616",
+    "last_ran_days": 38,
+    "age": 5,
+    "foaled": "2021-03-17",
+    "sex": {
+     "type": "g"
+    },
+    "formsummary": {
+     "display_text": "1-77527"
+    },
+    "previous_results": [
+     {
+      "race_id": 930624,
+      "date": "2026-07-31",
+      "time": "18:00:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 68.0,
+      "race_class": "5",
+      "race_name": "Zyn Pole Position Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "4/1",
+      "ride_description": "Slowly away, towards rear, struggling over 2f out, never dangerous"
+     },
+     {
+      "race_id": 926809,
+      "date": "2026-07-09",
+      "time": "17:52:00",
+      "course_name": "Newbury",
+      "course_shortcode": "NBY",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-12",
+      "position": 2,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 66.0,
+      "race_class": "5",
+      "race_name": "Highclere Castle Gin Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "13/2",
+      "ride_description": "Towards rear, headway 2f out, challenged winner well inside final furlong, just held"
+     },
+     {
+      "race_id": 926048,
+      "date": "2026-07-05",
+      "time": "13:32:00",
+      "course_name": "Southwell",
+      "course_shortcode": "STH",
+      "distance": "7f 14y",
+      "run_type": "FLAT",
+      "weight": "9-5",
+      "position": 5,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 66.0,
+      "race_class": "5",
+      "race_name": "attheraces.com/marketmovers Handicap (Div 1)",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "33/1",
+      "ride_description": "Towards rear of mid-division, still going okay 2f out, switched left and steady headway over 1f out, plugged on inside final furlong, not pace to challenge"
+     },
+     {
+      "race_id": 923769,
+      "date": "2026-06-19",
+      "time": "19:45:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-7",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 16,
+      "bha": 68.0,
+      "race_class": "5",
+      "race_name": "Find Your Zyn Moment Handicap",
+      "going": "Good (Good to Firm in places)",
+      "going_shortcode": "GD",
+      "odds": "33/1",
+      "ride_description": "Wore red hood to post, in rear, pushed along over 2f out and ran on steadily, never on terms"
+     },
+     {
+      "race_id": 919386,
+      "date": "2026-05-25",
+      "time": "14:40:00",
+      "course_name": "Leicester",
+      "course_shortcode": "LEI",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-8",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 8,
+      "bha": 68.0,
+      "race_class": "5",
+      "race_name": "Smooth Radio Ladies' Day Saturday 4th July Book Now Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "22/1",
+      "ride_description": "Wore hood to post, in rear of midfield, ridden over 2f out, never on terms"
+     },
+     {
+      "race_id": 871200,
+      "date": "2025-08-01",
+      "time": "17:20:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-6",
+      "position": 1,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 64.0,
+      "race_class": "5",
+      "race_name": "Hallgarten Novum Wines Handicap",
+      "going": "Good",
+      "going_shortcode": "GD",
+      "odds": "13/2",
+      "ride_description": "Held up towards rear, headway when not much room over 1f out, soon switched right, led inside final furlong, ran on, ridden out"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-11",
+   "headgear": [
+    {
+     "symbol": "t",
+     "name": "Tongue strap",
+     "count": 11
+    }
+   ],
+   "official_rating": 67,
+   "jockey_claim": 5.0,
+   "owner": {
+    "name": "The Kirtling Collective"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 3542,
+     "external_reference": []
+    },
+    "name": "Andi Brown",
+    "slug": "andi-brown/3542"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 32358,
+     "external_reference": []
+    },
+    "name": "K S McHugh"
+   },
+   "silk_filename": "20260907wnd141203.png",
+   "previous_silk_filename": "20260731nmk190005.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "16/1",
+    "historical_odds": []
+   },
+   "commentary": "Winless this season and added to a patchy record with seventh of 10 in handicap at Newmarket (6f, good to firm) last time. Others are preferred. ",
+   "race_history_stats": [
+    {
+     "type": "Distance",
+     "value": "2"
+    }
+   ],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058757,
+     "run_count": "17",
+     "win_count": "2",
+     "place_count": "4"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  },
+  {
+   "ride_reference": {
+    "id": 253058761,
+    "external_reference": []
+   },
+   "cloth_number": 5,
+   "draw_number": 1,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 1183754,
+     "external_reference": []
+    },
+    "name": "Noelies Dream",
+    "slug": "noelies-dream/1183754",
+    "last_ran_days": 269,
+    "age": 3,
+    "foaled": "2023-04-11",
+    "sex": {
+     "type": "g"
+    },
+    "formsummary": {
+     "display_text": "655815-"
+    },
+    "previous_results": [
+     {
+      "race_id": 894007,
+      "date": "2025-12-12",
+      "time": "16:30:00",
+      "course_name": "Southwell",
+      "course_shortcode": "STH",
+      "distance": "4f 214y",
+      "run_type": "FLAT",
+      "weight": "9-3",
+      "position": 5,
+      "casualty": {},
+      "runner_count": 6,
+      "bha": 68.0,
+      "race_class": "5",
+      "race_name": "Best Odds Guaranteed At BetMGM Nursery",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "4/1",
+      "ride_description": "Always struggling in last, never going pace to challenge"
+     },
+     {
+      "race_id": 890904,
+      "date": "2025-11-24",
+      "time": "16:00:00",
+      "course_name": "Newcastle",
+      "course_shortcode": "NCS",
+      "distance": "5f",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 1,
+      "casualty": {},
+      "runner_count": 6,
+      "bha": 64.0,
+      "race_class": "6",
+      "race_name": "Bet 10 Get 40 With BetMGM Nursery",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "7/4",
+      "ride_description": "In rear, ridden and headway 2f out, led inside final furlong, ran on well"
+     },
+     {
+      "race_id": 885875,
+      "date": "2025-10-23",
+      "time": "13:00:00",
+      "course_name": "Nottingham",
+      "course_shortcode": "NOT",
+      "distance": "6f 18y",
+      "run_type": "FLAT",
+      "weight": "9-5",
+      "position": 8,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 66.0,
+      "race_class": "5",
+      "race_name": "PricedUp Nursery",
+      "going": "Heavy",
+      "going_shortcode": "HVY",
+      "odds": "20/1",
+      "ride_description": "Slowly into stride, soon prominent near side of group, ridden and weakened inside final 2f"
+     },
+     {
+      "race_id": 879383,
+      "date": "2025-09-17",
+      "time": "13:15:00",
+      "course_name": "Beverley",
+      "course_shortcode": "BEV",
+      "distance": "5f",
+      "run_type": "FLAT",
+      "weight": "9-7",
+      "position": 5,
+      "casualty": {},
+      "runner_count": 12,
+      "race_class": "5",
+      "race_name": "EBF Restricted Maiden Stakes (GBB Race)",
+      "going": "Soft (Heavy in places)",
+      "going_shortcode": "SFT",
+      "odds": "9/1",
+      "ride_description": "Ridden away from stalls, prominent, led 2f out, soon edged left, hung left over 1f out, headed entering final furlong no extra final 100 yards"
+     },
+     {
+      "race_id": 873317,
+      "date": "2025-08-13",
+      "time": "13:45:00",
+      "course_name": "Beverley",
+      "course_shortcode": "BEV",
+      "distance": "5f",
+      "run_type": "FLAT",
+      "weight": "9-7",
+      "position": 5,
+      "casualty": {},
+      "runner_count": 8,
+      "race_class": "5",
+      "race_name": "Porsche Macan Electric EBF Restricted Maiden Stakes (GBB Race) (Div 2)",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "6/1",
+      "ride_description": "Towards rear, ridden and edged right inside 2f out, kept on inside final furlong, never dangerous"
+     },
+     {
+      "race_id": 871199,
+      "date": "2025-08-01",
+      "time": "16:45:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-4",
+      "position": 6,
+      "casualty": {},
+      "runner_count": 6,
+      "race_class": "4",
+      "race_name": "Up EBF Novice Stakes (GBB Race)",
+      "going": "Good",
+      "going_shortcode": "GD",
+      "odds": "25/1",
+      "ride_description": "Held up in touch, ridden over 1f out, soon beaten"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-10",
+   "headgear": [],
+   "official_rating": 68,
+   "owner": {
+    "name": "Hold My Beer, D Cunha & Gee Gees Racin"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 32879,
+     "external_reference": []
+    },
+    "name": "Dylan Cunha",
+    "slug": "dylan-cunha/32879"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 29889,
+     "external_reference": []
+    },
+    "name": "Christian Howarth"
+   },
+   "silk_filename": "20260907wnd141205.png",
+   "previous_silk_filename": "20251212sth163003.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "10/1",
+    "historical_odds": []
+   },
+   "commentary": "Lightly-raced sort who got off the mark in 5f nursery at Newcastle in November. Off since a below-par fifth of 6  at Southwell (5f) following month. Needs to hit the ground running on his belated return. ",
+   "race_history_stats": [],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058761,
+     "run_count": "6",
+     "win_count": "1",
+     "place_count": "1"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  },
+  {
+   "ride_reference": {
+    "id": 253058755,
+    "external_reference": []
+   },
+   "cloth_number": 2,
+   "draw_number": 13,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 937958,
+     "external_reference": []
+    },
+    "name": "Good Earth",
+    "slug": "good-earth/937958",
+    "last_ran_days": 10,
+    "age": 9,
+    "foaled": "2017-04-27",
+    "sex": {
+     "type": "g"
+    },
+    "formsummary": {
+     "display_text": "420564"
+    },
+    "previous_results": [
+     {
+      "race_id": 935371,
+      "date": "2026-08-28",
+      "time": "14:00:00",
+      "course_name": "Sandown",
+      "course_shortcode": "SAN",
+      "distance": "5f 10y",
+      "run_type": "FLAT",
+      "weight": "9-12",
+      "position": 4,
+      "casualty": {},
+      "runner_count": 9,
+      "bha": 70.0,
+      "race_class": "5",
+      "race_name": "Killik Handicap",
+      "going": "Good",
+      "going_shortcode": "GD",
+      "odds": "4/1",
+      "ride_description": "Went early to post, midfield, asked for effort over 1f out, stayed on without threatening"
+     },
+     {
+      "race_id": 932802,
+      "date": "2026-08-13",
+      "time": "14:45:00",
+      "course_name": "Beverley",
+      "course_shortcode": "BEV",
+      "distance": "5f",
+      "run_type": "FLAT",
+      "weight": "9-6",
+      "position": 6,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 72.0,
+      "race_class": "5",
+      "race_name": "Connexin Super Fast Sprint Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "20/1",
+      "ride_description": "Rear of midfield, pushed along and some headway 1f out, kept on"
+     },
+     {
+      "race_id": 930624,
+      "date": "2026-07-31",
+      "time": "18:00:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "10-0",
+      "position": 5,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 73.0,
+      "race_class": "5",
+      "race_name": "Zyn Pole Position Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "9/1",
+      "ride_description": "Prominent, pushed along over 2f out, no extra inside final 110 yards"
+     },
+     {
+      "race_id": 927307,
+      "date": "2026-07-11",
+      "time": "16:30:00",
+      "course_name": "York",
+      "course_shortcode": "YOR",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-2",
+      "position": 18,
+      "casualty": {},
+      "runner_count": 19,
+      "bha": 73.0,
+      "race_class": "4",
+      "race_name": "John Smith's Sprint Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "40/1",
+      "ride_description": "Went to post early, towards rear, outpaced over 2f out, soon beaten and eased"
+     },
+     {
+      "race_id": 923474,
+      "date": "2026-06-20",
+      "time": "16:07:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "5f",
+      "run_type": "FLAT",
+      "weight": "9-13",
+      "position": 2,
+      "casualty": {},
+      "runner_count": 7,
+      "bha": 73.0,
+      "race_class": "5",
+      "race_name": "JCB Tele-Handler Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "2/1",
+      "ride_description": "Went to post early, tracked leaders, pushed along well over 1f out, carried slightly left approaching final furlong, ran on but always held by winner"
+     },
+     {
+      "race_id": 921951,
+      "date": "2026-06-12",
+      "time": "12:38:00",
+      "course_name": "Sandown",
+      "course_shortcode": "SAN",
+      "distance": "5f 10y",
+      "run_type": "FLAT",
+      "weight": "9-3",
+      "position": 4,
+      "casualty": {},
+      "runner_count": 9,
+      "bha": 74.0,
+      "race_class": "4",
+      "race_name": "Chris Barnett Memorial Handicap (Div 1)",
+      "going": "Good (Good to Soft in places)",
+      "going_shortcode": "GD",
+      "odds": "11/1",
+      "ride_description": "Taken down early, prominent, chased leaders and every chance 1f out, kept on but no extra towards finish"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-12",
+   "headgear": [],
+   "official_rating": 68,
+   "owner": {
+    "name": "Mrs H Lloyd-herrington"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 1654,
+     "external_reference": []
+    },
+    "name": "M Herrington",
+    "slug": "m-herrington/1654"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 31744,
+     "external_reference": []
+    },
+    "name": "Connor Planas"
+   },
+   "silk_filename": "20260907wnd141202.png",
+   "previous_silk_filename": "20260828san150002.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "10/1",
+    "historical_odds": []
+   },
+   "commentary": "A 3-time 6f winner early in 2026. Posted a respectable fourth of 9 in handicap at Sandown (5f, good to soft) 10 days ago. Back on his last winning mark now so not without interest. ",
+   "race_history_stats": [
+    {
+     "type": "Distance",
+     "value": "7"
+    }
+   ],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058755,
+     "run_count": "106",
+     "win_count": "16",
+     "place_count": "43"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  },
+  {
+   "ride_reference": {
+    "id": 253058771,
+    "external_reference": []
+   },
+   "cloth_number": 12,
+   "draw_number": 6,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 1144257,
+     "external_reference": []
+    },
+    "name": "Zoulu Warrior",
+    "slug": "zoulu-warrior/1144257",
+    "last_ran_days": 20,
+    "age": 4,
+    "foaled": "2022-04-27",
+    "sex": {
+     "type": "g"
+    },
+    "formsummary": {
+     "display_text": "1-47075"
+    },
+    "previous_results": [
+     {
+      "race_id": 933582,
+      "date": "2026-08-18",
+      "time": "16:00:00",
+      "course_name": "Chepstow",
+      "course_shortcode": "CHP",
+      "distance": "6f 16y",
+      "run_type": "FLAT",
+      "weight": "9-8",
+      "position": 5,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 63.0,
+      "race_class": "6",
+      "race_name": "Saxon Automobiles Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "16/1",
+      "ride_description": "Int ouch with leaders, pushed along over 1f out, soon outpaced, kept on one pace final furlong"
+     },
+     {
+      "race_id": 928075,
+      "date": "2026-07-16",
+      "time": "16:00:00",
+      "course_name": "Chepstow",
+      "course_shortcode": "CHP",
+      "distance": "6f 16y",
+      "run_type": "FLAT",
+      "weight": "9-7",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 7,
+      "bha": 66.0,
+      "race_class": "5",
+      "race_name": "DragonBet Welsh Racing Festival 9-11th October Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "9/1",
+      "ride_description": "Slowly away, keen towards rear throughout"
+     },
+     {
+      "race_id": 923769,
+      "date": "2026-06-19",
+      "time": "19:45:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-7",
+      "position": 14,
+      "casualty": {},
+      "runner_count": 16,
+      "bha": 68.0,
+      "race_class": "5",
+      "race_name": "Find Your Zyn Moment Handicap",
+      "going": "Good (Good to Firm in places)",
+      "going_shortcode": "GD",
+      "odds": "28/1",
+      "ride_description": "Chased leaders, dropped away tamely 2f out"
+     },
+     {
+      "race_id": 903805,
+      "date": "2026-02-20",
+      "time": "18:00:00",
+      "course_name": "Southwell",
+      "course_shortcode": "STH",
+      "distance": "6f 16y",
+      "run_type": "FLAT",
+      "weight": "9-6",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 69.0,
+      "race_class": "5",
+      "race_name": "Friday Night Live With SBK Handicap",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "10/1",
+      "ride_description": "Midfield, ridden over 2f out, faded inside final furlong"
+     },
+     {
+      "race_id": 898846,
+      "date": "2026-01-19",
+      "time": "19:00:00",
+      "course_name": "Wolverhampton",
+      "course_shortcode": "WOL",
+      "distance": "6f 20y",
+      "run_type": "FLAT",
+      "weight": "9-8",
+      "position": 4,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 69.0,
+      "race_class": "5",
+      "race_name": "Make The Move To Midnite Handicap",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "9/4",
+      "ride_description": "Prominent, shaken up 2f out, faded final furlong"
+     },
+     {
+      "race_id": 896161,
+      "date": "2025-12-27",
+      "time": "20:00:00",
+      "course_name": "Wolverhampton",
+      "course_shortcode": "WOL",
+      "distance": "6f 20y",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 1,
+      "casualty": {},
+      "runner_count": 11,
+      "bha": 65.0,
+      "race_class": "6",
+      "race_name": "Join The Midnite Movement Handicap",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "11/4",
+      "ride_description": "Tracked leaders, pushed along 2f out, took second and ridden 1f out, led narrowly approaching final 110yds, forged on towards finish"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-5",
+   "headgear": [],
+   "official_rating": 61,
+   "owner": {
+    "name": "Llewelyn,runeckles And Wetumpka Racing"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 210,
+     "external_reference": []
+    },
+    "name": "H Main",
+    "slug": "h-main/210"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 34615,
+     "external_reference": []
+    },
+    "name": "Mason Paetel"
+   },
+   "silk_filename": "20260907wnd141212.png",
+   "previous_silk_filename": "20260818chp170004.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "25/1",
+    "historical_odds": []
+   },
+   "commentary": "Back-to-back 6f winner on the all-weather in December but has struggled off a revised mark since. More is required despite a falling mark.",
+   "race_history_stats": [
+    {
+     "type": "Distance",
+     "value": "2"
+    }
+   ],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058771,
+     "run_count": "18",
+     "win_count": "3",
+     "place_count": "6"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  },
+  {
+   "ride_reference": {
+    "id": 253058763,
+    "external_reference": []
+   },
+   "cloth_number": 9,
+   "draw_number": 11,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 1032017,
+     "external_reference": []
+    },
+    "name": "Rebel Path",
+    "slug": "rebel-path/1032017",
+    "last_ran_days": 24,
+    "age": 7,
+    "foaled": "2019-04-20",
+    "sex": {
+     "type": "g"
+    },
+    "formsummary": {
+     "display_text": "738038"
+    },
+    "previous_results": [
+     {
+      "race_id": 932981,
+      "date": "2026-08-14",
+      "time": "18:02:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-8",
+      "position": 8,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 64.0,
+      "race_class": "5",
+      "race_name": "Maritime Cargo STS Container Storage Solutions Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "11/2",
+      "ride_description": "Mounted in chute, prominent, asked for effort 2f out, weakened 1f out"
+     },
+     {
+      "race_id": 930624,
+      "date": "2026-07-31",
+      "time": "18:00:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-5",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 64.0,
+      "race_class": "5",
+      "race_name": "Zyn Pole Position Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "17/2",
+      "ride_description": "Took keen hold, led, ridden over 1f out, headed inside final furlong, lost second towards finish"
+     },
+     {
+      "race_id": 926809,
+      "date": "2026-07-09",
+      "time": "17:52:00",
+      "course_name": "Newbury",
+      "course_shortcode": "NBY",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-13",
+      "position": 10,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 67.0,
+      "race_class": "5",
+      "race_name": "Highclere Castle Gin Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "9/2",
+      "ride_description": "Bumped start, chased leaders, edged right 2f out, soon lost place"
+     },
+     {
+      "race_id": 923769,
+      "date": "2026-06-19",
+      "time": "19:45:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-8",
+      "position": 8,
+      "casualty": {},
+      "runner_count": 16,
+      "bha": 69.0,
+      "race_class": "5",
+      "race_name": "Find Your Zyn Moment Handicap",
+      "going": "Good (Good to Firm in places)",
+      "going_shortcode": "GD",
+      "odds": "4/1",
+      "ride_description": "Mounted in chute, close up, ridden and lost position 2f out, soon beaten"
+     },
+     {
+      "race_id": 917300,
+      "date": "2026-05-16",
+      "time": "14:27:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "8-13",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 70.0,
+      "race_class": "4",
+      "race_name": "Download The BetMGM App Handicap",
+      "going": "Good (Good to Firm in places)",
+      "going_shortcode": "GD",
+      "odds": "9/1",
+      "ride_description": "Mounted in chute, led, ridden and headed over 1f out, kept on same pace inside final furlong"
+     },
+     {
+      "race_id": 905635,
+      "date": "2026-03-04",
+      "time": "18:30:00",
+      "course_name": "Kempton",
+      "course_shortcode": "KEM",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "8-10",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 8,
+      "bha": 72.0,
+      "race_class": "4",
+      "race_name": "Bet 20 Get 20 With Unibet Handicap (Div 1)",
+      "going": "Standard / Slow",
+      "going_shortcode": "STS",
+      "odds": "40/1",
+      "ride_description": "Took keen hold, disputed lead, ridden over 2f out, headed approaching final furlong, soon faded"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-7",
+   "headgear": [
+    {
+     "symbol": "v",
+     "name": "Visor",
+     "count": 6
+    }
+   ],
+   "official_rating": 63,
+   "jockey_claim": 5.0,
+   "owner": {
+    "name": "Diomed Racing And Partner"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 205,
+     "external_reference": []
+    },
+    "name": "S C Williams",
+    "slug": "s-c-williams/205"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 31432,
+     "external_reference": []
+    },
+    "name": "Olivia Haines"
+   },
+   "silk_filename": "20260907wnd141209.png",
+   "previous_silk_filename": "20260814nmk190207.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "10/1",
+    "historical_odds": []
+   },
+   "commentary": "On a losing run but ran well in first-time cheekpieces when third at Newmarket in July and run best ignored (poorly drawn) when eighth of 12 there (6f, good to firm) since. Needs considering in a change of headgear.  ",
+   "race_history_stats": [
+    {
+     "type": "Distance",
+     "value": "4"
+    }
+   ],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058763,
+     "run_count": "37",
+     "win_count": "4",
+     "place_count": "12"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  },
+  {
+   "ride_reference": {
+    "id": 253058770,
+    "external_reference": []
+   },
+   "cloth_number": 14,
+   "draw_number": 8,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 1192274,
+     "external_reference": []
+    },
+    "name": "Yes Waliim",
+    "slug": "yes-waliim/1192274",
+    "last_ran_days": 21,
+    "age": 3,
+    "foaled": "2023-04-12",
+    "sex": {
+     "type": "g"
+    },
+    "formsummary": {
+     "display_text": "674612"
+    },
+    "previous_results": [
+     {
+      "race_id": 933442,
+      "date": "2026-08-17",
+      "time": "18:25:00",
+      "course_name": "Windsor",
+      "course_shortcode": "WDR",
+      "distance": "6f 12y",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 2,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 55.0,
+      "race_class": "6",
+      "race_name": "Matchbook Betting Exchange Supporting UK Racing Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "4/1",
+      "ride_description": "Dipped slightly start, chased leaders, pushed along 2f out, went second inside final furlong, no impression on winner and eased towards finish"
+     },
+     {
+      "race_id": 932442,
+      "date": "2026-08-11",
+      "time": "16:00:00",
+      "course_name": "Lingfield",
+      "course_shortcode": "LIN",
+      "distance": "7f 1y",
+      "run_type": "FLAT",
+      "weight": "9-3",
+      "position": 1,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 55.0,
+      "race_class": "6",
+      "race_name": "Follow attheraces On Instagram Apprentice Handicap",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "13/2",
+      "ride_description": "Wore red hood to post, made all but pestered throughout, pushed along well over 1f out, rider got reins caught 1f out, ridden final 110yds and kept on, always doing enough"
+     },
+     {
+      "race_id": 930634,
+      "date": "2026-07-31",
+      "time": "14:45:00",
+      "course_name": "Wolverhampton",
+      "course_shortcode": "WOL",
+      "distance": "1m 142y",
+      "run_type": "FLAT",
+      "weight": "8-6",
+      "position": 6,
+      "casualty": {},
+      "runner_count": 9,
+      "bha": 57.0,
+      "race_class": "5",
+      "race_name": "Thank You, Jane Broad, For All Your Support Handicap",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "8/1",
+      "ride_description": "Towards rear, some headway over 1f out, outpaced inside final furlong, weakened towards finish"
+     },
+     {
+      "race_id": 923786,
+      "date": "2026-06-23",
+      "time": "18:35:00",
+      "course_name": "Newbury",
+      "course_shortcode": "NBY",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "8-12",
+      "position": 4,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 59.0,
+      "race_class": "5",
+      "race_name": "Jebel Ali Racecourse Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "14/1",
+      "ride_description": "Shifted left start, handy in second, led halfway, pushed along over 2f out, headed over 1f out and faded"
+     },
+     {
+      "race_id": 921352,
+      "date": "2026-06-09",
+      "time": "16:28:00",
+      "course_name": "Salisbury",
+      "course_shortcode": "SAL",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-6",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 11,
+      "bha": 61.0,
+      "race_class": "6",
+      "race_name": "Charter 1227 Catering Handicap",
+      "going": "Soft",
+      "going_shortcode": "SFT",
+      "odds": "22/1",
+      "ride_description": "Never better than mid-division"
+     },
+     {
+      "race_id": 917490,
+      "date": "2026-05-18",
+      "time": "15:57:00",
+      "course_name": "Lingfield",
+      "course_shortcode": "LIN",
+      "distance": "4f 217y",
+      "run_type": "FLAT",
+      "weight": "9-3",
+      "position": 6,
+      "casualty": {},
+      "runner_count": 8,
+      "bha": 64.0,
+      "race_class": "5",
+      "race_name": "Sporting Times Sprint Handicap",
+      "going": "Good (Good to Firm in places)",
+      "going_shortcode": "GD",
+      "odds": "18/1",
+      "ride_description": "Wore hood to post, held up in rear, ridden 2f out, kept on inside final furlong, no danger"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "8-13",
+   "headgear": [
+    {
+     "symbol": "p",
+     "name": "Cheek pieces",
+     "count": 1
+    }
+   ],
+   "official_rating": 57,
+   "jockey_claim": 7.0,
+   "owner": {
+    "name": "Mr Richard Hughes"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 176,
+     "external_reference": []
+    },
+    "name": "R Hughes",
+    "slug": "r-hughes/176"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 35792,
+     "external_reference": []
+    },
+    "name": "Oliver Hoodless"
+   },
+   "silk_filename": "20260907wnd141214.png",
+   "previous_silk_filename": "20260831sth173507.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "4/1",
+    "historical_odds": []
+   },
+   "commentary": "Got off the mark under this rider in 7f handicap at Lingfield in August and backed it up with a good C&D second 3 weeks ago. Not taken lightly nudged up 2 lb in first-time cheekpieces. ",
+   "race_history_stats": [],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058770,
+     "run_count": "10",
+     "win_count": "1",
+     "place_count": "3"
+    }
+   ],
+   "medication": [],
+   "insights": [
+    {
+     "type": "FIRST_TIME_CHEEK_PIECES"
+    }
+   ]
+  },
+  {
+   "ride_reference": {
+    "id": 253058766,
+    "external_reference": []
+   },
+   "cloth_number": 15,
+   "draw_number": 12,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 1185292,
+     "external_reference": []
+    },
+    "name": "Stock Market",
+    "slug": "stock-market/1185292",
+    "last_ran_days": 23,
+    "age": 3,
+    "foaled": "2023-04-03",
+    "sex": {
+     "type": "g"
+    },
+    "formsummary": {
+     "display_text": "032533"
+    },
+    "previous_results": [
+     {
+      "race_id": 933222,
+      "date": "2026-08-15",
+      "time": "17:16:00",
+      "course_name": "Lingfield",
+      "course_shortcode": "LIN",
+      "distance": "5f 6y",
+      "run_type": "FLAT",
+      "weight": "8-9",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 4,
+      "bha": 58.0,
+      "race_class": "5",
+      "race_name": "Sky Sports Racing 415 Handicap",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "10/1",
+      "ride_description": "Led, faced challenge before halfway, headed inside final furlong, not pace of leading pair towards finish"
+     },
+     {
+      "race_id": 921352,
+      "date": "2026-06-09",
+      "time": "16:28:00",
+      "course_name": "Salisbury",
+      "course_shortcode": "SAL",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-4",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 11,
+      "bha": 59.0,
+      "race_class": "6",
+      "race_name": "Charter 1227 Catering Handicap",
+      "going": "Soft",
+      "going_shortcode": "SFT",
+      "odds": "11/2",
+      "ride_description": "Mid-division, headway and edged left 2f out, pressed for second inside final furlong, no extra final strides"
+     },
+     {
+      "race_id": 918094,
+      "date": "2026-05-21",
+      "time": "17:40:00",
+      "course_name": "Chepstow",
+      "course_shortcode": "CHP",
+      "distance": "5f 16y",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 5,
+      "casualty": {},
+      "runner_count": 5,
+      "bha": 60.0,
+      "race_class": "6",
+      "race_name": "Guaranteed Odds At David Lucas Bookmakers Handicap",
+      "going": "Good to Soft",
+      "going_shortcode": "GS",
+      "odds": "9/2",
+      "ride_description": "In rear, pushed along 2f out, always behind"
+     },
+     {
+      "race_id": 916932,
+      "date": "2026-05-14",
+      "time": "16:40:00",
+      "course_name": "Salisbury",
+      "course_shortcode": "SAL",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-6",
+      "position": 2,
+      "casualty": {},
+      "runner_count": 15,
+      "bha": 57.0,
+      "race_class": "6",
+      "race_name": "Molson Coors Handicap",
+      "going": "Good (Good to Firm in places)",
+      "going_shortcode": "GD",
+      "odds": "15/2",
+      "ride_description": "Midfield, headway and switched left 2f out, slightly short of room 1f out,, ran on well inside final furlong, chased winner inside final 110yds, no extra towards finish"
+     },
+     {
+      "race_id": 915234,
+      "date": "2026-05-04",
+      "time": "15:43:00",
+      "course_name": "Windsor",
+      "course_shortcode": "WDR",
+      "distance": "5f 21y",
+      "run_type": "FLAT",
+      "weight": "8-13",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 60.0,
+      "race_class": "5",
+      "race_name": "BetWright Bet The Wright Way Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "18/1",
+      "ride_description": "Midfield, ridden over 1f out, headway 1f out, ran on well"
+     },
+     {
+      "race_id": 913917,
+      "date": "2026-04-26",
+      "time": "14:55:00",
+      "course_name": "Nottingham",
+      "course_shortcode": "NOT",
+      "distance": "6f 18y",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 12,
+      "casualty": {},
+      "runner_count": 15,
+      "bha": 60.0,
+      "race_class": "6",
+      "race_name": "Pertemps Network Group Handicap",
+      "going": "Good (Good to Firm in places)",
+      "going_shortcode": "GD",
+      "odds": "8/1",
+      "ride_description": "Sweating, in rear of far side group, ridden along over 2f out, brief headway over 1f out, weakened inside final furlong"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "8-13",
+   "headgear": [
+    {
+     "symbol": "b",
+     "name": "Blinkers",
+     "count": 8
+    }
+   ],
+   "official_rating": 57,
+   "jockey_claim": 5.0,
+   "owner": {
+    "name": "Mr Darren Lewis"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 132,
+     "external_reference": []
+    },
+    "name": "A W Carroll",
+    "slug": "a-w-carroll/132"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 35858,
+     "external_reference": []
+    },
+    "name": "Myla Coppins"
+   },
+   "silk_filename": "20260907wnd141215.png",
+   "previous_silk_filename": "20260815lin181604.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "8/1",
+    "historical_odds": []
+   },
+   "commentary": "Is 0-14 but has recorded creditable placed efforts on 4 of his last 5 starts, shaping as if the run was needed after a break when third at Lingfield (5f, all-weather) 23 days ago. Not out of things in refitted blinkers. ",
+   "race_history_stats": [],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058766,
+     "run_count": "14",
+     "win_count": "0",
+     "place_count": "3"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  },
+  {
+   "ride_reference": {
+    "id": 253058749,
+    "external_reference": []
+   },
+   "cloth_number": 8,
+   "draw_number": 10,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 1133249,
+     "external_reference": []
+    },
+    "name": "Arnaz",
+    "slug": "arnaz/1133249",
+    "last_ran_days": 15,
+    "age": 5,
+    "foaled": "2021-03-09",
+    "sex": {
+     "type": "g"
+    },
+    "formsummary": {
+     "display_text": "878116"
+    },
+    "previous_results": [
+     {
+      "race_id": 934461,
+      "date": "2026-08-23",
+      "time": "14:50:00",
+      "course_name": "Brighton",
+      "course_shortcode": "BRI",
+      "distance": "5f 215y",
+      "run_type": "FLAT",
+      "weight": "9-3",
+      "position": 6,
+      "casualty": {},
+      "runner_count": 16,
+      "bha": 60.0,
+      "race_class": "2",
+      "race_name": "Blackmore Equestrian Construction Handicap (Brighton Summer Sprint Series Final)",
+      "going": "Good to Firm (Good in Places)",
+      "going_shortcode": "GF",
+      "odds": "5/2",
+      "ride_description": "Held up in midfield, ridden 2f out, kept on final furlong, nearest finish"
+     },
+     {
+      "race_id": 933582,
+      "date": "2026-08-18",
+      "time": "16:00:00",
+      "course_name": "Chepstow",
+      "course_shortcode": "CHP",
+      "distance": "6f 16y",
+      "run_type": "FLAT",
+      "weight": "8-13",
+      "position": 1,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 54.0,
+      "race_class": "6",
+      "race_name": "Saxon Automobiles Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "6/5",
+      "ride_description": "Soon raced in close second, led after 1f, steadily went clear from over 1f out, pushed out, easily"
+     },
+     {
+      "race_id": 932095,
+      "date": "2026-08-09",
+      "time": "13:06:00",
+      "course_name": "Chepstow",
+      "course_shortcode": "CHP",
+      "distance": "6f 16y",
+      "run_type": "FLAT",
+      "weight": "9-6",
+      "position": 1,
+      "casualty": {},
+      "runner_count": 7,
+      "bha": 54.0,
+      "race_class": "6",
+      "race_name": "Happy 100th Birthday Chepstow Racecourse 'Training Series' Apprentice Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "9/1",
+      "ride_description": "Made all, quickened clear well over 2f out, pushed along over 1f out, kept on well, unchallenged"
+     },
+     {
+      "race_id": 930901,
+      "date": "2026-08-01",
+      "time": "15:50:00",
+      "course_name": "Doncaster",
+      "course_shortcode": "DON",
+      "distance": "7f 6y",
+      "run_type": "FLAT",
+      "weight": "9-8",
+      "position": 8,
+      "casualty": {},
+      "runner_count": 11,
+      "bha": 56.0,
+      "race_class": "6",
+      "race_name": "Harrison College Handicap (Div 1)",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "7/1",
+      "ride_description": "Awkward start, took keen hold, midfield, in rear 3f out, some headway and ridden 2f out, faded final furlong"
+     },
+     {
+      "race_id": 925070,
+      "date": "2026-06-30",
+      "time": "18:39:00",
+      "course_name": "Ffos Las",
+      "course_shortcode": "FFL",
+      "distance": "7f 80y",
+      "run_type": "FLAT",
+      "weight": "9-11",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 8,
+      "bha": 59.0,
+      "race_class": "6",
+      "race_name": "WWP 34 Years Finding Customers Their Dream Homes Handicap",
+      "going": "Good (Good to Firm in places)",
+      "going_shortcode": "GD",
+      "odds": "18/1",
+      "ride_description": "Midfield, shaken up over 2f out, weakened and ran on same pace inside final furlong"
+     },
+     {
+      "race_id": 917614,
+      "date": "2026-05-19",
+      "time": "15:45:00",
+      "course_name": "Lingfield",
+      "course_shortcode": "LIN",
+      "distance": "7f",
+      "run_type": "FLAT",
+      "weight": "9-7",
+      "position": 8,
+      "casualty": {},
+      "runner_count": 9,
+      "bha": 62.0,
+      "race_class": "6",
+      "race_name": "Sky Sports Racing Virgin 512 Handicap (Div 1)",
+      "going": "Good (Good to Soft in places)",
+      "going_shortcode": "GD",
+      "odds": "18/1",
+      "ride_description": "Took keen hold in touch, ridden over 2f out, minor progress over 1f out, soon held"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-8",
+   "headgear": [],
+   "official_rating": 64,
+   "jockey_claim": 7.0,
+   "owner": {
+    "name": "Laurence Bellman"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 363,
+     "external_reference": []
+    },
+    "name": "D M Loughnane",
+    "slug": "d-m-loughnane/363"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 35210,
+     "external_reference": []
+    },
+    "name": "Hope Regan"
+   },
+   "silk_filename": "20260907wnd141208.png",
+   "previous_silk_filename": "20260823bgh155005.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "7/1",
+    "historical_odds": []
+   },
+   "commentary": "Bagged a pair of 6f Chepstow handicaps in August. Unable to lead from a high draw when a solid sixth of 16 in handicap at Brighton (6f, good) 15 days ago, nearest finish. Expected to be bang there eased 1 lb.",
+   "race_history_stats": [
+    {
+     "type": "BeatenFavourite",
+     "value": "9"
+    },
+    {
+     "type": "Distance",
+     "value": "2"
+    }
+   ],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058749,
+     "run_count": "28",
+     "win_count": "3",
+     "place_count": "10"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  },
+  {
+   "ride_reference": {
+    "id": 253058754,
+    "external_reference": []
+   },
+   "cloth_number": 1,
+   "draw_number": 7,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 1143415,
+     "external_reference": []
+    },
+    "name": "Distant Rumble",
+    "slug": "distant-rumble/1143415",
+    "last_ran_days": 46,
+    "age": 4,
+    "foaled": "2022-02-14",
+    "sex": {
+     "type": "g"
+    },
+    "formsummary": {
+     "display_text": "621377"
+    },
+    "previous_results": [
+     {
+      "race_id": 929249,
+      "date": "2026-07-23",
+      "time": "18:05:00",
+      "course_name": "Newbury",
+      "course_shortcode": "NBY",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-11",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 8,
+      "bha": 69.0,
+      "race_class": "5",
+      "race_name": "Country & Town House Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "5/1",
+      "ride_description": "Mounted in chute, went to post early wearing red hood, tracked leaders, pushed along 2f out, soon lost position and dropped away"
+     },
+     {
+      "race_id": 926085,
+      "date": "2026-07-04",
+      "time": "14:50:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "8-13",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 70.0,
+      "race_class": "4",
+      "race_name": "Betway Bet The Responsible Way Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "12/1",
+      "ride_description": "Mounted in chute and taken down early wearing hood, slowly into stride, held up in rear, never a factor"
+     },
+     {
+      "race_id": 921348,
+      "date": "2026-06-09",
+      "time": "14:18:00",
+      "course_name": "Salisbury",
+      "course_shortcode": "SAL",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-4",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 70.0,
+      "race_class": "5",
+      "race_name": "Remembering Jane Samuels Handicap",
+      "going": "Soft",
+      "going_shortcode": "SFT",
+      "odds": "5/2",
+      "ride_description": "Led, ridden over 1f out, pressed final furlong, headed final 110yds, lost second final strides"
+     },
+     {
+      "race_id": 919015,
+      "date": "2026-05-23",
+      "time": "15:57:00",
+      "course_name": "Windsor",
+      "course_shortcode": "WDR",
+      "distance": "6f 12y",
+      "run_type": "FLAT",
+      "weight": "9-11",
+      "position": 1,
+      "casualty": {},
+      "runner_count": 14,
+      "bha": 67.0,
+      "race_class": "6",
+      "race_name": "Trev's Final Furlong Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "7/2",
+      "ride_description": "Wore red hood to post, slowly away, mid-division, headway over 2f out, driven over 1f out, led inside final furlong, ran on"
+     },
+     {
+      "race_id": 916926,
+      "date": "2026-05-14",
+      "time": "13:08:00",
+      "course_name": "Salisbury",
+      "course_shortcode": "SAL",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-4",
+      "position": 2,
+      "casualty": {},
+      "runner_count": 9,
+      "bha": 65.0,
+      "race_class": "5",
+      "race_name": "Al Basti Equiworld, Dubai Apprentice Handicap",
+      "going": "Good (Good to Firm in places)",
+      "going_shortcode": "GD",
+      "odds": "10/1",
+      "ride_description": "Wore hood to post, midfield, ridden 2f out, chased winner inside final furlong, kept on"
+     },
+     {
+      "race_id": 904498,
+      "date": "2026-02-25",
+      "time": "20:10:00",
+      "course_name": "Kempton",
+      "course_shortcode": "KEM",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-1",
+      "position": 6,
+      "casualty": {},
+      "runner_count": 7,
+      "bha": 67.0,
+      "race_class": "5",
+      "race_name": "Get Daily Price Boosts At Unibet Handicap",
+      "going": "Standard / Slow",
+      "going_shortcode": "STS",
+      "odds": "20/1",
+      "ride_description": "Mounted on course and went to post early in hood, took keen hold, prominent, pushed along 2f out, faded inside final furlong"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-12",
+   "headgear": [],
+   "official_rating": 68,
+   "jockey_claim": 5.0,
+   "owner": {
+    "name": "Homecroft Wealth Racing"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 1880,
+     "external_reference": []
+    },
+    "name": "R A Teal",
+    "slug": "r-a-teal/1880"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 28213,
+     "external_reference": []
+    },
+    "name": "Owen Lewis"
+   },
+   "silk_filename": "20260907wnd141201.png",
+   "previous_silk_filename": "20260723nbu190505.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "16/1",
+    "historical_odds": []
+   },
+   "commentary": "Resumed winning ways over C&D in the spring and in good form since until beating only one in handicap at Newbury (6f, good to firm) in July. Needs to bounce back. ",
+   "race_history_stats": [
+    {
+     "type": "CourseDistance",
+     "value": "2"
+    }
+   ],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058754,
+     "run_count": "23",
+     "win_count": "3",
+     "place_count": "8"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  },
+  {
+   "ride_reference": {
+    "id": 253058752,
+    "external_reference": []
+   },
+   "cloth_number": 4,
+   "draw_number": 9,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 1188864,
+     "external_reference": []
+    },
+    "name": "Come On Eibhlin",
+    "slug": "come-on-eibhlin/1188864",
+    "last_ran_days": 27,
+    "age": 3,
+    "foaled": "2023-05-16",
+    "sex": {
+     "type": "f"
+    },
+    "formsummary": {
+     "display_text": "334593"
+    },
+    "previous_results": [
+     {
+      "race_id": 932436,
+      "date": "2026-08-11",
+      "time": "19:15:00",
+      "course_name": "Nottingham",
+      "course_shortcode": "NOT",
+      "distance": "6f 18y",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 6,
+      "bha": 69.0,
+      "race_class": "5",
+      "race_name": "Oddschecker Fillies' Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "9/2",
+      "ride_description": "Slowly away, in touch in rear, headway and ridden over 2f out, lost position over 1f out, kept on and went third post"
+     },
+     {
+      "race_id": 930227,
+      "date": "2026-07-29",
+      "time": "19:00:00",
+      "course_name": "Sandown",
+      "course_shortcode": "SAN",
+      "distance": "1m 1f 209y",
+      "run_type": "FLAT",
+      "weight": "9-5",
+      "position": 9,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 71.0,
+      "race_class": "5",
+      "race_name": "Spillers Fillies' Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "12/1",
+      "ride_description": "Chased leaders, switched left over 2f out, weakened over 1f out"
+     },
+     {
+      "race_id": 926058,
+      "date": "2026-07-04",
+      "time": "15:35:00",
+      "course_name": "Beverley",
+      "course_shortcode": "BEV",
+      "distance": "1m 100y",
+      "run_type": "FLAT",
+      "weight": "9-4",
+      "position": 5,
+      "casualty": {},
+      "runner_count": 9,
+      "bha": 72.0,
+      "race_class": "5",
+      "race_name": "Weatherbys Global Stallions App Coconut Cup Fillies' Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "10/3",
+      "ride_description": "In touch with leaders, outpaced and dropped towards rear soon after halfway, hung left and some headway from 1f out, drifter to near side and no impression towards finish"
+     },
+     {
+      "race_id": 924859,
+      "date": "2026-06-25",
+      "time": "12:15:00",
+      "course_name": "Newmarket",
+      "course_shortcode": "NMK",
+      "distance": "1m",
+      "run_type": "FLAT",
+      "weight": "8-13",
+      "position": 4,
+      "casualty": {},
+      "runner_count": 6,
+      "bha": 73.0,
+      "race_class": "4",
+      "race_name": "Hallgarten Fillies' Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "5/1",
+      "ride_description": "Took keen hold, led, shaken up 2f out, joined 1f out, ridden and headed inside final furlong, soon lost second, no extra towards finish"
+     },
+     {
+      "race_id": 920528,
+      "date": "2026-06-04",
+      "time": "14:42:00",
+      "course_name": "Wetherby",
+      "course_shortcode": "WTH",
+      "distance": "7f",
+      "run_type": "FLAT",
+      "weight": "9-5",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 74.0,
+      "race_class": "5",
+      "race_name": "Heineken 0.0 Fillies' Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "11/2",
+      "ride_description": "Front rank, pushed along over 2f out, challenging over 1f out, ran on same pace inside final furlong"
+     },
+     {
+      "race_id": 918567,
+      "date": "2026-05-23",
+      "time": "19:00:00",
+      "course_name": "Windsor",
+      "course_shortcode": "WDR",
+      "distance": "1m 31y",
+      "run_type": "FLAT",
+      "weight": "9-0",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 8,
+      "bha": 74.0,
+      "race_class": "4",
+      "race_name": "Bodhi Solutions - Facilities Management Front Runner Fillies' Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "11/1",
+      "ride_description": "Towards rear, some headway before halfway, outpaced over 1f out, rallied and chased leaders inside final furlong, kept on"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-10",
+   "headgear": [
+    {
+     "symbol": "b",
+     "name": "Blinkers",
+     "count": 3
+    },
+    {
+     "symbol": "t",
+     "name": "Tongue strap",
+     "count": 3
+    }
+   ],
+   "official_rating": 68,
+   "owner": {
+    "name": "Hold My Beer, Gee Gees Racing & N Cla"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 32879,
+     "external_reference": []
+    },
+    "name": "Dylan Cunha",
+    "slug": "dylan-cunha/32879"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 32748,
+     "external_reference": []
+    },
+    "name": "Jack Callan"
+   },
+   "silk_filename": "20260907wnd141204.png",
+   "previous_silk_filename": "20260811ntt201501.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "13/2",
+    "historical_odds": []
+   },
+   "commentary": "C&D winner. Largely in good nick this season, a never-nearer third of 6 in handicap at Nottingham (6f, good to firm) 27 days ago. Not out of things, especially if she gets a strong pace to aim at.",
+   "race_history_stats": [
+    {
+     "type": "CourseDistance",
+     "value": "1"
+    }
+   ],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058752,
+     "run_count": "14",
+     "win_count": "1",
+     "place_count": "3"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  },
+  {
+   "ride_reference": {
+    "id": 253058759,
+    "external_reference": []
+   },
+   "cloth_number": 7,
+   "draw_number": 5,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 976741,
+     "external_reference": []
+    },
+    "name": "Monsieur Patat",
+    "slug": "monsieur-patat/976741",
+    "last_ran_days": 34,
+    "age": 9,
+    "foaled": "2017-04-10",
+    "sex": {
+     "type": "g"
+    },
+    "formsummary": {
+     "display_text": "09-3275"
+    },
+    "previous_results": [
+     {
+      "race_id": 931225,
+      "date": "2026-08-04",
+      "time": "13:30:00",
+      "course_name": "Ffos Las",
+      "course_shortcode": "FFL",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 5,
+      "casualty": {},
+      "runner_count": 7,
+      "bha": 65.0,
+      "race_class": "5",
+      "race_name": "Happy 70th Birthday Brian Glanville Handicap",
+      "going": "Good",
+      "going_shortcode": "GD",
+      "odds": "6/1",
+      "ride_description": "Dwelt, mid-division, pushed along well over 1f out, no impression and faded final 110yds"
+     },
+     {
+      "race_id": 924911,
+      "date": "2026-06-29",
+      "time": "20:00:00",
+      "course_name": "Windsor",
+      "course_shortcode": "WDR",
+      "distance": "6f 12y",
+      "run_type": "FLAT",
+      "weight": "9-4",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 9,
+      "bha": 63.0,
+      "race_class": "5",
+      "race_name": "Find Us At fitzdares.com Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "5/2",
+      "ride_description": "Took keen hold, held up in rear, ridden over 1f out, kept on, no danger"
+     },
+     {
+      "race_id": 923786,
+      "date": "2026-06-23",
+      "time": "18:35:00",
+      "course_name": "Newbury",
+      "course_shortcode": "NBY",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 2,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 63.0,
+      "race_class": "5",
+      "race_name": "Jebel Ali Racecourse Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "9/2",
+      "ride_description": "Rear mid-division, headway over 2f out, switched right well over 1f out, ridden 1f out and ran on to lead final 110yds, headed towards finish"
+     },
+     {
+      "race_id": 915613,
+      "date": "2026-05-06",
+      "time": "19:30:00",
+      "course_name": "Kempton",
+      "course_shortcode": "KEM",
+      "distance": "7f",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 65.0,
+      "race_class": "6",
+      "race_name": "Get Daily Price Boosts At Unibet Handicap",
+      "going": "Standard / Slow",
+      "going_shortcode": "STS",
+      "odds": "40/1",
+      "ride_description": "Raced keenly, in rear, headway and waiting for room over 2f out, ridden and ran on strongly inside final furlong, nearest finish"
+     },
+     {
+      "race_id": 888569,
+      "date": "2025-11-08",
+      "time": "17:30:00",
+      "course_name": "Wolverhampton",
+      "course_shortcode": "WOL",
+      "distance": "7f 36y",
+      "run_type": "FLAT",
+      "weight": "9-5",
+      "position": 9,
+      "casualty": {},
+      "runner_count": 9,
+      "bha": 66.0,
+      "race_class": "5",
+      "race_name": "Always Gamble Responsibly At BetMGM Handicap (Div 2)",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "20/1",
+      "ride_description": "Mid division, progress to lead after 2f, pushed along and headed entering straight, soon no extra and weakened"
+     },
+     {
+      "race_id": 885596,
+      "date": "2025-10-22",
+      "time": "19:10:00",
+      "course_name": "Kempton",
+      "course_shortcode": "KEM",
+      "distance": "7f",
+      "run_type": "FLAT",
+      "weight": "9-6",
+      "position": 10,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 67.0,
+      "race_class": "5",
+      "race_name": "Try Unibet's Superboosts Handicap",
+      "going": "Standard / Slow",
+      "going_shortcode": "STS",
+      "odds": "18/1",
+      "ride_description": "Slowly into stride, always towards rear"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-8",
+   "headgear": [],
+   "official_rating": 64,
+   "owner": {
+    "name": "Wackey Racers & Partner"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 1662,
+     "external_reference": []
+    },
+    "name": "A Wintle",
+    "slug": "a-wintle/1662"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 34855,
+     "external_reference": []
+    },
+    "name": "Ashley Lewis"
+   },
+   "silk_filename": "20260907wnd141207.png",
+   "previous_silk_filename": "20260804ffl143005.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "14/1",
+    "historical_odds": []
+   },
+   "commentary": "Gained a third C&D victory last August. Winless since and went too freely when fifth of 7 in handicap at Ffos Las (6f, good) 34 days ago. Not ruled out if settling better here.  ",
+   "race_history_stats": [
+    {
+     "type": "CourseDistance",
+     "value": "3"
+    }
+   ],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058759,
+     "run_count": "49",
+     "win_count": "7",
+     "place_count": "12"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  },
+  {
+   "ride_reference": {
+    "id": 253058758,
+    "external_reference": []
+   },
+   "cloth_number": 13,
+   "draw_number": 2,
+   "finish_position": 0,
+   "ride_status": "DOUBTFUL",
+   "horse": {
+    "horse_reference": {
+     "id": 1057937,
+     "external_reference": []
+    },
+    "name": "Lahina Bay",
+    "slug": "lahina-bay/1057937",
+    "last_ran_days": 6,
+    "age": 6,
+    "foaled": "2020-04-08",
+    "sex": {
+     "type": "m"
+    },
+    "formsummary": {
+     "display_text": "327322"
+    },
+    "previous_results": [
+     {
+      "race_id": 936021,
+      "date": "2026-09-01",
+      "time": "16:25:00",
+      "course_name": "Lingfield",
+      "course_shortcode": "LIN",
+      "distance": "6f 1y",
+      "run_type": "FLAT",
+      "weight": "9-4",
+      "position": 2,
+      "casualty": {},
+      "runner_count": 8,
+      "bha": 57.0,
+      "race_class": "6",
+      "race_name": "Racing Partnership Celebrating 10 Years Handicap",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "9/1",
+      "ride_description": "Mounted on chute, prominent, outpaced 2f out, rallied and switched towards centre 1f out, chased leaders inside final furlong, took second towards finish"
+     },
+     {
+      "race_id": 933386,
+      "date": "2026-08-13",
+      "time": "17:11:00",
+      "course_name": "Windsor",
+      "course_shortcode": "WDR",
+      "distance": "6f 12y",
+      "run_type": "FLAT",
+      "weight": "9-8",
+      "position": 2,
+      "casualty": {},
+      "runner_count": 11,
+      "bha": 57.0,
+      "race_class": "6",
+      "race_name": "Bet 20 Pound Get 40 Pound In Free Bets At matchbook.com Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "12/1",
+      "ride_description": "Prominent, led before halfway, pushed along 2f out, hampered 1f out, ridden inside final furlong, headed inside final 110yds, weakened towards finish"
+     },
+     {
+      "race_id": 931068,
+      "date": "2026-08-03",
+      "time": "18:30:00",
+      "course_name": "Windsor",
+      "course_shortcode": "WDR",
+      "distance": "6f 12y",
+      "run_type": "FLAT",
+      "weight": "8-10",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 5,
+      "bha": 57.0,
+      "race_class": "5",
+      "race_name": "Happy Birthday Tyne Patterson Fillies' Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "6/4",
+      "ride_description": "Led, shaken up over 2f out, ridden and headed over 1f out, lost second inside final furlong, no extra towards finish"
+     },
+     {
+      "race_id": 929691,
+      "date": "2026-07-25",
+      "time": "18:15:00",
+      "course_name": "Salisbury",
+      "course_shortcode": "SAL",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-2",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 58.0,
+      "race_class": "5",
+      "race_name": "Brokerswood Holiday Park Handicap",
+      "going": "Good to Firm (Firm in places)",
+      "going_shortcode": "GF",
+      "odds": "9/2",
+      "ride_description": "Led, headed halfway, pushed along over 2f out, ridden over 1f out, weakened quickly inside final furlong"
+     },
+     {
+      "race_id": 927263,
+      "date": "2026-07-11",
+      "time": "16:05:00",
+      "course_name": "Salisbury",
+      "course_shortcode": "SAL",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-6",
+      "position": 2,
+      "casualty": {},
+      "runner_count": 5,
+      "bha": 57.0,
+      "race_class": "6",
+      "race_name": "Al Basti Equiworld, Dubai Apprentice Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "17/2",
+      "ride_description": "Led, ridden 2f out, headed over 1f out, rallied and kept on final furlong"
+     },
+     {
+      "race_id": 923643,
+      "date": "2026-06-22",
+      "time": "16:45:00",
+      "course_name": "Windsor",
+      "course_shortcode": "WDR",
+      "distance": "6f 12y",
+      "run_type": "FLAT",
+      "weight": "9-12",
+      "position": 3,
+      "casualty": {},
+      "runner_count": 11,
+      "bha": 58.0,
+      "race_class": "6",
+      "race_name": "Royal Windsor Supports Racing Staff Week Apprentice Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "12/1",
+      "ride_description": "Mounted on course, went left start, led early, headed but pressed leader after 1f, ridden and led 2f out, headed entering final furlong, no extra and lost second entering final 110yds"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-1",
+   "headgear": [],
+   "official_rating": 57,
+   "owner": {
+    "name": "Mrs Daphne Finch"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 34853,
+     "external_reference": []
+    },
+    "name": "R Cook & J Bridger",
+    "slug": "r-cook-j-bridger/34853"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 835,
+     "external_reference": []
+    },
+    "name": "Non Runner"
+   },
+   "silk_filename": "20260907wnd141213.png",
+   "previous_silk_filename": "20260901lin172507.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "5/1",
+    "historical_odds": []
+   },
+   "commentary": "C&D winner. Back in good nick of late, runner-up in handicaps over C&D and at Lingfield (6f, all-weather) recently. Can make her presence felt again off the same mark. ",
+   "race_history_stats": [
+    {
+     "type": "CourseDistance",
+     "value": "2"
+    }
+   ],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058758,
+     "run_count": "57",
+     "win_count": "7",
+     "place_count": "22"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  },
+  {
+   "ride_reference": {
+    "id": 253058756,
+    "external_reference": []
+   },
+   "cloth_number": 11,
+   "draw_number": 3,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 1153438,
+     "external_reference": []
+    },
+    "name": "Havana Halo",
+    "slug": "havana-halo/1153438",
+    "last_ran_days": 35,
+    "age": 4,
+    "foaled": "2022-03-03",
+    "sex": {
+     "type": "f"
+    },
+    "formsummary": {
+     "display_text": "647-062"
+    },
+    "previous_results": [
+     {
+      "race_id": 931068,
+      "date": "2026-08-03",
+      "time": "18:30:00",
+      "course_name": "Windsor",
+      "course_shortcode": "WDR",
+      "distance": "6f 12y",
+      "run_type": "FLAT",
+      "weight": "9-1",
+      "position": 2,
+      "casualty": {},
+      "runner_count": 5,
+      "bha": 62.0,
+      "race_class": "5",
+      "race_name": "Happy Birthday Tyne Patterson Fillies' Handicap",
+      "going": "Good to Firm",
+      "going_shortcode": "GF",
+      "odds": "7/2",
+      "ride_description": "In touch, nudged along over 2f out, made steady headway over 1f out, went second inside final furlong, kept on but no match for winner"
+     },
+     {
+      "race_id": 927466,
+      "date": "2026-07-13",
+      "time": "18:10:00",
+      "course_name": "Lingfield",
+      "course_shortcode": "LIN",
+      "distance": "6f 1y",
+      "run_type": "FLAT",
+      "weight": "9-6",
+      "position": 6,
+      "casualty": {},
+      "runner_count": 7,
+      "bha": 65.0,
+      "race_class": "5",
+      "race_name": "Follow AtTheRaces On X Fillies' Handicap",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "20/1",
+      "ride_description": "Midfield, ridden over 2f out, no response, never involved"
+     },
+     {
+      "race_id": 923783,
+      "date": "2026-06-23",
+      "time": "18:00:00",
+      "course_name": "Newbury",
+      "course_shortcode": "NBY",
+      "distance": "7f",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 11,
+      "casualty": {},
+      "runner_count": 12,
+      "bha": 68.0,
+      "race_class": "5",
+      "race_name": "Venture Security Handicap",
+      "going": "Good to Firm (Good in places)",
+      "going_shortcode": "GF",
+      "odds": "40/1",
+      "ride_description": "Handy, pushed along over 2f out, weakened tamely over 1f out"
+     },
+     {
+      "race_id": 882947,
+      "date": "2025-10-07",
+      "time": "17:00:00",
+      "course_name": "Southwell",
+      "course_shortcode": "STH",
+      "distance": "7f 14y",
+      "run_type": "FLAT",
+      "weight": "9-5",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 10,
+      "bha": 69.0,
+      "race_class": "5",
+      "race_name": "Arc 1MILLION Bonus Has 150k Increase! Fillies' Handicap",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "33/1",
+      "ride_description": "Chased leader on outside, pushed along and outpaced over 2f out, soon no extra"
+     },
+     {
+      "race_id": 872681,
+      "date": "2025-08-06",
+      "time": "15:55:00",
+      "course_name": "Kempton",
+      "course_shortcode": "KEM",
+      "distance": "7f",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 4,
+      "casualty": {},
+      "runner_count": 8,
+      "bha": 70.0,
+      "race_class": "5",
+      "race_name": "Unibet Supporting Safer Gambling Handicap (Div 1)",
+      "going": "Standard / Slow",
+      "going_shortcode": "STS",
+      "odds": "11/5",
+      "ride_description": "Led, ridden 2f out, headed entering final furlong, soon faded and lost 2 places"
+     },
+     {
+      "race_id": 858718,
+      "date": "2025-05-22",
+      "time": "15:52:00",
+      "course_name": "Haydock",
+      "course_shortcode": "HAY",
+      "distance": "6f 212y",
+      "run_type": "FLAT",
+      "weight": "9-2",
+      "position": 6,
+      "casualty": {},
+      "runner_count": 6,
+      "race_class": "4",
+      "race_name": "Betfred 'Play Fred's 5 Million' Fillies' Novice Stakes (GBB Race)",
+      "going": "Good to Firm (Good In Places)",
+      "going_shortcode": "GF",
+      "odds": "16/1",
+      "ride_description": "Held up in last pair, some headway out wide over 2f out, ridden and weakened inside final 2f"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-6",
+   "headgear": [],
+   "official_rating": 62,
+   "jockey_claim": 3.0,
+   "owner": {
+    "name": "Mr R F Haynes"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 1391,
+     "external_reference": []
+    },
+    "name": "D J S Ffrench Davis",
+    "slug": "d-j-s-ffrench-davis/1391"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 31747,
+     "external_reference": []
+    },
+    "name": "Ben Ffrench-Davis"
+   },
+   "silk_filename": "20260907wnd141211.png",
+   "previous_silk_filename": "20260803wnd193004.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "7/1",
+    "historical_odds": []
+   },
+   "commentary": "Low-mileage filly. Posted her best effort of the season with second of 5 in handicap over C&D (good to firm) last month. Possibilities if building on it now. ",
+   "race_history_stats": [],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058756,
+     "run_count": "8",
+     "win_count": "0",
+     "place_count": "1"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  },
+  {
+   "ride_reference": {
+    "id": 253058762,
+    "external_reference": []
+   },
+   "cloth_number": 6,
+   "draw_number": 15,
+   "finish_position": 0,
+   "ride_status": "RUNNER",
+   "horse": {
+    "horse_reference": {
+     "id": 940433,
+     "external_reference": []
+    },
+    "name": "Punchbowl Flyer",
+    "slug": "punchbowl-flyer/940433",
+    "last_ran_days": 23,
+    "age": 9,
+    "foaled": "2017-02-19",
+    "sex": {
+     "type": "g"
+    },
+    "formsummary": {
+     "display_text": "021167"
+    },
+    "previous_results": [
+     {
+      "race_id": 933223,
+      "date": "2026-08-15",
+      "time": "17:46:00",
+      "course_name": "Lingfield",
+      "course_shortcode": "LIN",
+      "distance": "6f 1y",
+      "run_type": "FLAT",
+      "weight": "9-5",
+      "position": 7,
+      "casualty": {},
+      "runner_count": 8,
+      "bha": 66.0,
+      "race_class": "5",
+      "race_name": "Follow attheraces On Instagram Handicap",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "14/1",
+      "ride_description": "Always towards rear, outpaced soon after halfway, weakened over 1f out"
+     },
+     {
+      "race_id": 930455,
+      "date": "2026-07-30",
+      "time": "17:57:00",
+      "course_name": "Wolverhampton",
+      "course_shortcode": "WOL",
+      "distance": "6f 20y",
+      "run_type": "FLAT",
+      "weight": "9-2",
+      "position": 6,
+      "casualty": {},
+      "runner_count": 11,
+      "bha": 66.0,
+      "race_class": "6",
+      "race_name": "Get Raceday Ready Claiming Stakes",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "33/1",
+      "ride_description": "Towards rear, pushed along 2f out, plugged on, never on terms"
+     },
+     {
+      "race_id": 923777,
+      "date": "2026-06-23",
+      "time": "13:30:00",
+      "course_name": "Ffos Las",
+      "course_shortcode": "FFL",
+      "distance": "6f",
+      "run_type": "FLAT",
+      "weight": "9-4",
+      "position": 1,
+      "casualty": {},
+      "runner_count": 7,
+      "bha": 60.0,
+      "race_class": "5",
+      "race_name": "South Wales Medical Event Cover Handicap",
+      "going": "Good",
+      "going_shortcode": "GD",
+      "odds": "12/1",
+      "ride_description": "Led, ridden and headed narrowly approaching final furlong, soon edged left but battled on, regained lead final strides, gamely."
+     },
+     {
+      "race_id": 922386,
+      "date": "2026-06-15",
+      "time": "15:33:00",
+      "course_name": "Chepstow",
+      "course_shortcode": "CHP",
+      "distance": "6f 16y",
+      "run_type": "FLAT",
+      "weight": "9-9",
+      "position": 1,
+      "casualty": {},
+      "runner_count": 7,
+      "bha": 60.0,
+      "race_class": "6",
+      "race_name": "Engstaff-In Birthday Handicap",
+      "going": "Good",
+      "going_shortcode": "GD",
+      "odds": "15/8",
+      "ride_description": "Raced on stands rail, made all but pestered, ridden over 1f out, ran on well inside final furlong"
+     },
+     {
+      "race_id": 920979,
+      "date": "2026-06-06",
+      "time": "19:25:00",
+      "course_name": "Chepstow",
+      "course_shortcode": "CHP",
+      "distance": "6f 16y",
+      "run_type": "FLAT",
+      "weight": "9-7",
+      "position": 2,
+      "casualty": {},
+      "runner_count": 11,
+      "bha": 58.0,
+      "race_class": "6",
+      "race_name": "Capital Windscreens Supporting Autisitic Society Handicap",
+      "going": "Soft (Good to Soft in places)",
+      "going_shortcode": "SFT",
+      "odds": "4/1",
+      "ride_description": "Raced stands side and led overall, ridden and headed well over 1f out, kept on in third, rallied inside final furlong, just denied"
+     },
+     {
+      "race_id": 920705,
+      "date": "2026-06-01",
+      "time": "17:00:00",
+      "course_name": "Wolverhampton",
+      "course_shortcode": "WOL",
+      "distance": "7f 36y",
+      "run_type": "FLAT",
+      "weight": "9-7",
+      "position": 10,
+      "casualty": {},
+      "runner_count": 11,
+      "bha": 58.0,
+      "race_class": "6",
+      "race_name": "Get Raceday Ready Handicap",
+      "going": "Standard",
+      "going_shortcode": "ST",
+      "odds": "20/1",
+      "ride_description": "Led but pestered, ridden over 2f out, headed over 1f out, weakened inside final 110yds"
+     }
+    ],
+    "future_entries": []
+   },
+   "handicap": "9-9",
+   "headgear": [
+    {
+     "symbol": "b",
+     "name": "Blinkers",
+     "count": 61
+    }
+   ],
+   "official_rating": 65,
+   "jockey_claim": 5.0,
+   "owner": {
+    "name": "The Cross Racing Club"
+   },
+   "trainer": {
+    "business_reference": {
+     "id": 1658,
+     "external_reference": []
+    },
+    "name": "J G M O'Shea",
+    "slug": "j-g-m-o-shea/1658"
+   },
+   "jockey": {
+    "person_reference": {
+     "id": 34322,
+     "external_reference": []
+    },
+    "name": "Alexandra Egan"
+   },
+   "silk_filename": "20260907wnd141206.png",
+   "previous_silk_filename": "20260815lin184607.png",
+   "casualty": {},
+   "betting": {
+    "favourite": {},
+    "current_odds": "25/1",
+    "historical_odds": []
+   },
+   "commentary": "Won back-to-back 6f handicaps at Chepstow and Ffos Las in June. Ran poorly in handicap at Lingfield (6f, all-weather) 23 days ago. Bounce back needed from this 3-time C&D winner.  ",
+   "race_history_stats": [
+    {
+     "type": "CourseDistance",
+     "value": "3"
+    }
+   ],
+   "horse_lifetime_stats": [
+    {
+     "ride_id": 253058762,
+     "run_count": "69",
+     "win_count": "10",
+     "place_count": "18"
+    }
+   ],
+   "medication": [],
+   "insights": []
+  }
+ ],
+ "number_of_placed_rides": 3,
+ "videos": [],
+ "place_pot": {},
+ "quad_pot": {},
+ "on_course_book_percentage": 145.39,
+ "deductions": [],
+ "stewards": "NONE",
+ "last_years_winners": []
+}
