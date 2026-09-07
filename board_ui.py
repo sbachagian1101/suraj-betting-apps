@@ -24,6 +24,21 @@ FAST_REDRAW = "1s"        # while a match is within 5 minutes: alternate colours
 SLOW_REDRAW = "30s"
 
 
+def select_board_matches(matches: list[SW.Match], leagues: set[str], horizon_hours: float,
+                         now: datetime) -> list[SW.Match]:
+    """Matches to put on the board: every live or finished match of the day in the
+    chosen leagues, plus scheduled ones kicking off within the horizon."""
+    out = []
+    for m in matches:
+        if m.competition not in leagues:
+            continue
+        if m.stage in ("2", "3"):
+            out.append(m)
+        elif m.stage == "1" and 0 <= (m.kickoff - now).total_seconds() <= horizon_hours * 3600:
+            out.append(m)
+    return sorted(out, key=lambda x: x.kickoff)
+
+
 def starts_in(m: SW.Match, now: datetime) -> str:
     if m.stage == "3":
         return "FT"
@@ -167,10 +182,9 @@ def render(D, n_rates: int, n_lineup: int) -> None:
                "once; started matches turn rose. Click a row for the charts.")
     if start:
         now = datetime.now(timezone.utc)
-        picked = [m for m in idx.matches if m.competition in set(chosen_leagues)
-                  and m.stage == "1" and 0 <= (m.kickoff - now).total_seconds() <= horizon * 3600]
+        picked = select_board_matches(idx.matches, set(chosen_leagues), horizon, now)
         if not picked:
-            st.warning("No scheduled matches in those leagues inside that horizon.")
+            st.warning("No matches in those leagues inside that horizon.")
         else:
             BOARD.configure(picked, n_rates, n_lineup, D["offset"], D["tz"])
     if stop:

@@ -39,8 +39,10 @@ Soccerway and Flashscore share team ids, so a Flashscore team link
     leagues: a summary table (CSV download) plus one expander per match with the same
     breakdown as the two-team page. Budget about 10 seconds per match.
 
-  * **Live board**: pick leagues (every scheduled match of the day in them goes on the
-    board) and a background worker inside the server keeps the predictions fresh on a
+  * **Live board**: pick leagues (every match of the day in them goes on the board:
+    scheduled ones inside the horizon, plus live and finished ones, which are predicted
+    once from their pre-match history and shown in rose with the score) and a background
+    worker inside the server keeps the predictions fresh on a
     tiered schedule: every 60 min beyond 3 h from kick-off, 30 min within 3 h, 15 min
     within 1 h, 5 min within 30 min. Started matches are frozen (score and status keep
     updating every 5 min). The table has start time, starts-in, country, league, match,

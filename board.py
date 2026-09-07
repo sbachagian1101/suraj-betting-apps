@@ -89,7 +89,13 @@ class Board:
                     new[m.id] = old
                 else:
                     new[m.id] = Row(match=m, next_due=now)
-            self.rows = new
+            # an update never drops a match that has already started, as long as
+            # its league is still on the board
+            comps = {m.competition for m in matches}
+            for mid, old in self.rows.items():
+                if mid not in new and old.started and old.match.competition in comps and not reset:
+                    new[mid] = old
+            self.rows = dict(sorted(new.items(), key=lambda kv: kv[1].match.kickoff))
             self._log(f"board set to {len(new)} matches (windows {n_rates}/{n_lineup})")
         self.start()
 
@@ -141,9 +147,13 @@ class Board:
         del self.log[:-50]
 
     def _due(self, now: datetime) -> Optional[Row]:
+        """Next row to compute: anything never computed (including live and
+        finished matches, predicted once from their pre-match history), then
+        scheduled rows whose refresh is due. Started rows are never refreshed."""
         with self._lock:
             cands = [r for r in self.rows.values()
-                     if not r.started and r.next_due is not None and r.next_due <= now]
+                     if (r.analysis is None and not r.error)
+                     or (not r.started and r.next_due is not None and r.next_due <= now)]
         cands.sort(key=lambda r: (r.analysis is not None, r.match.kickoff))   # never-computed first
         return cands[0] if cands else None
 

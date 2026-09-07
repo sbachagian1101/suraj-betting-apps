@@ -462,13 +462,63 @@ def test_board_computes_due_rows_with_fake_compute(monkeypatch):
     bd.configure(scheduled, 8, 4, 0, 4)
     bd.stop()
     assert bd.status()["computed"] == 2
-    # a finished match is never queued
+    # a finished match is predicted once (from pre-match history) and then left alone
     fin = [m for m in ms if m.stage == "3"]
     bd2 = B.Board(compute=fake_compute)
     bd2.configure(fin, 8, 4, 0, 4)
+    deadline = _t.time() + 5
+    while _t.time() < deadline and bd2.status()["computed"] < len(fin):
+        _t.sleep(0.1)
     _t.sleep(0.3)
     bd2.stop()
-    assert bd2.status()["computed"] == 0
+    assert bd2.status()["computed"] == len(fin) == 1
+    assert all(r.next_due is None for r in bd2.snapshot())
+
+
+def test_board_keeps_started_matches_and_predicts_finished_ones_once(monkeypatch):
+    import time as _t
+    import board as B
+    import board_ui as BU
+    import pipeline as P
+    from datetime import timedelta as td
+    now = datetime.now(timezone.utc)
+    ms = SW._parse_matches(_daily_feed())
+    for m in ms:                                   # make kick-offs relative to now
+        m.kickoff = now + td(hours=1)
+    fin, sched = ms[0], ms[1]                      # Everton (finished) and Arsenal (scheduled), same league
+    fin.kickoff = now - td(hours=2)
+    live = ms[3]; live.stage = "2"; live.kickoff = now - td(minutes=30)
+    # selection: live and finished always, scheduled only inside the horizon
+    picked = BU.select_board_matches(ms, {"ENGLAND: Premier League", "FRANCE: Ligue 1"}, 0.5, now)
+    assert [m.id for m in picked] == [fin.id, live.id]
+    picked = BU.select_board_matches(ms, {"ENGLAND: Premier League"}, 2, now)
+    assert [m.id for m in picked] == [fin.id, sched.id]
+
+    calls = []
+
+    def fake_compute(m, n_rates, n_lineup):
+        calls.append(m.id)
+        a = M.profile(m.home_name, _records("h", [1.5] * 3, [1.0] * 3, [{"p": 7.0}] * 3))
+        b = M.profile(m.away_name, _records("a", [1.2] * 3, [1.3] * 3, [{"p": 6.8}] * 3))
+        return P.Analysis(m, P.TeamData("h", m.home_id, m.home_name, a.records),
+                          P.TeamData("a", m.away_id, m.away_name, b.records),
+                          a, b, None, None, M.predict(a, b), None, n_rates, n_lineup)
+
+    monkeypatch.setattr(B, "daily_cached", lambda *a, **k: [])
+    monkeypatch.setattr(B, "LOOP_SLEEP", 0.05)
+    bd = B.Board(compute=fake_compute)
+    bd.configure([fin, sched], 8, 4, 0, 4)
+    deadline = _t.time() + 10
+    while _t.time() < deadline and bd.status()["computed"] < 2:
+        _t.sleep(0.1)
+    assert bd.status()["computed"] == 2 and calls.count(fin.id) == 1     # finished match predicted once
+    # the scheduled match kicks off: an update with only the *new* scheduled list keeps it
+    sched.stage = "2"
+    bd.configure([fin], 8, 4, 0, 4)              # same league, sched not in the list any more
+    assert sched.id in {r.match.id for r in bd.snapshot()}
+    bd.stop()
+    _t.sleep(0.2)
+    assert calls.count(fin.id) == 1               # never refreshed after computing
 
 
 def test_charts_build_from_an_analysis():
