@@ -15,7 +15,7 @@ import streamlit as st
 import model as M
 import soccerway as SW
 import ui
-from pipeline import DayIndex, analyse_fixture, daily_cached, latest_match
+from pipeline import DayIndex, analyse_fixture, daily_cached, latest_match, on_day
 
 DEFAULT_LEAGUES = "ENGLAND: Premier League\nFRANCE: Ligue 1\nGERMANY: Bundesliga"
 STATUS_OPTIONS = ["Scheduled", "Live", "Finished"]
@@ -61,7 +61,7 @@ with tab_pick:
                "Change the day or offset in the sidebar, then fetch again.")
     if fetch:
         try:
-            ms = daily_cached(offset, tz, refresh=True)
+            ms = on_day(daily_cached(offset, tz, refresh=True), day, tz)
         except SW.SoccerwayError as exc:
             st.error(str(exc))
             st.stop()
@@ -140,7 +140,7 @@ with tab_all:
     if go:
         queries = [ln for ln in leagues_text.splitlines() if ln.strip()]
         try:
-            all_matches = daily_cached(offset, tz)
+            all_matches = on_day(daily_cached(offset, tz), day, tz)
         except SW.SoccerwayError as exc:
             st.error(str(exc))
             st.stop()

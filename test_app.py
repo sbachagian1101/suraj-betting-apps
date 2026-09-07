@@ -345,6 +345,19 @@ def test_league_day_page_runs_for_premier_league():
     assert any("matches predicted" in c.value for c in at.caption)
 
 
+def test_on_day_trims_the_feed_padding():
+    import pipeline as P
+    from datetime import date
+    ms = SW._parse_matches(_daily_feed())
+    # feed kick-offs: 1788699600 = Sun 6 Sep 2026 13:00 UTC, 1788708600 = 15:30, 1788718600 = 18:16
+    assert ms[0].kickoff == datetime(2026, 9, 6, 13, 0, tzinfo=timezone.utc)
+    assert len(P.on_day(ms, date(2026, 9, 6), 4)) == 4
+    assert P.on_day(ms, date(2026, 9, 7), 4) == []
+    # at UTC-14 the 13:00 UTC match is still 5 Sep locally, the later ones are 6 Sep
+    assert [m.id for m in P.on_day(ms, date(2026, 9, 5), -14)] == ["QsyJgS7m"]
+    assert len(P.on_day(ms, date(2026, 9, 6), -14)) == 3
+
+
 def test_day_index_splits_country_and_league():
     import pipeline as P
     ms = SW._parse_matches(_daily_feed())

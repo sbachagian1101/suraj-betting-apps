@@ -23,7 +23,7 @@ _NEEDED = {
               "XG_WEIGHT", "LEAGUE_AVG", "PRIOR_GAMES", "HOME_ADV", "AWAY_ADV",
               "RATING_K", "RATING_K_OPP", "MAX_GOALS", "DECAY", "N_RATES", "N_LINEUP"],
     "pipeline": ["analyse_pair", "analyse_fixture", "daily_cached", "latest_match",
-                 "DayIndex", "Analysis"],
+                 "on_day", "DayIndex", "Analysis"],
     "ui": ["render_full", "render_compact"],
 }
 _missing = []

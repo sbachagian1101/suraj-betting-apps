@@ -83,6 +83,16 @@ def daily_cached(day_offset: int, tz_hours: int, refresh: bool = False) -> list[
     return _cached(key, 120, lambda: SW.daily_matches(day_offset, tz_hours))
 
 
+def on_day(matches: list[SW.Match], day, tz_hours: int) -> list[SW.Match]:
+    """Keep only matches whose local date (UTC+tz) is ``day``.
+
+    The day feed pads its window by about an hour either side, so a 23:00
+    match from the evening before shows up in "today"; this trims that.
+    """
+    from datetime import timedelta
+    return [m for m in matches if (m.kickoff + timedelta(hours=tz_hours)).date() == day]
+
+
 def latest_match(match: SW.Match, day_offset: int, tz_hours: int) -> SW.Match:
     """The freshest copy of ``match`` from the day feed (status and score move)."""
     for m in daily_cached(day_offset, tz_hours):
