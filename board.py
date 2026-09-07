@@ -60,8 +60,8 @@ class Row:
 class Board:
     compute: Callable[[SW.Match, int, int], Analysis] = analyse_fixture
     rows: dict[str, Row] = field(default_factory=dict)
-    n_rates: int = 8
-    n_lineup: int = 4
+    n_rates: int = 12
+    n_lineup: int = 5
     day_offset: int = 0
     tz_hours: int = 0
     running: bool = False

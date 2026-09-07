@@ -78,13 +78,13 @@ Shared code: `pipeline.py` (fetching, caching, the analysis object) and `ui.py` 
 
 ## How the prediction works
 
-1. Attack rate = 70% xG-for + 30% goals-for per game over the last N matches (default 8,
+1. Attack rate = 70% xG-for + 30% goals-for per game over the last N matches (default 12,
    up to 15), **recency-weighted**: match k back counts 0.85^k, so the newest match has
-   weight 1 and the eighth about 0.32. Defence rate the same from xGA and goals-against.
+   weight 1 and the twelfth about 0.17. Defence rate the same from xGA and goals-against.
    Matches without xG use goals only.
 2. Both rates are shrunk toward a league average (1.45 goals) with a prior weight of 2 games,
    against the effective sample size (sum of the weights).
-3. Player ratings and the line-up comparison use a **shorter window** (default 4 matches,
+3. Player ratings and the line-up comparison use a **shorter window** (default 5 matches,
    up to 10), because who is in form changes faster than team strength.
 4. Expected goals: `home = att_home x def_away / avg x 1.12`, `away = att_away x def_home / avg x 0.90`.
 5. Line-up adjustment: each of today's starters gets their mean Soccerway rating over the

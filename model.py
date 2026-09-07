@@ -30,8 +30,8 @@ from soccerway import MatchRecord, Player
 LEAGUE_AVG = 1.45          # goals per team per game (top-flight Europe)
 PRIOR_GAMES = 2.0          # shrinkage weight in "games"
 DECAY = 0.85               # recency weight: match k back counts DECAY**k
-N_RATES = 8                # default window for xG / goals rates
-N_LINEUP = 4               # default window for player ratings and line-up
+N_RATES = 12               # default window for xG / goals rates (user's setting)
+N_LINEUP = 5               # default window for player ratings and line-up (user's setting)
 HOME_ADV = 1.12
 AWAY_ADV = 0.90
 XG_WEIGHT = 0.7            # rest is actual goals
