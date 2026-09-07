@@ -38,6 +38,8 @@ import numpy as np
 
 from common import Entry, PastRun, RaceCard
 
+BUILD = "2026-09-07c"      # bumped with every change; app.py refuses a stale copy
+
 
 @dataclass
 class Params:
@@ -195,6 +197,8 @@ def speed_score(e: Entry, aes_range: Optional[tuple[float, float]] = None) -> Op
     aes = e.extras.get("aes")
     if aes is not None and aes_range and aes_range[1] > aes_range[0]:
         return max(0.0, min(1.0, (aes - aes_range[0]) / (aes_range[1] - aes_range[0])))
+    if e.extras.get("settle_frac") is not None:        # R&S Enhanced Form settling positions
+        return max(0.0, min(1.0, 1.0 - float(e.extras["settle_frac"])))
     if e.settling is not None:
         return max(0.0, min(1.0, 1.0 - e.settling / 10.0))
     lab = (e.speed_label or "").strip().lower()
@@ -366,8 +370,13 @@ def rate(card: RaceCard, p: Params | None = None) -> tuple[list[Rated], list[str
             t["speed"] = base
         else:
             t["speed"] = 0.0
-        t["sectional"] = (p.k_sectional * (med_sec - e.sectional_600)
-                          if e.sectional_600 and med_sec else 0.0)
+        # R&S L600m splits come from different tracks and distances, so they carry half
+        # the weight of HKJC's same-course sectionals and are capped at +-1.5 L.
+        if e.sectional_600 and med_sec:
+            k = p.k_sectional * (0.5 if e.extras.get("sectional_source") else 1.0)
+            t["sectional"] = max(-1.5, min(1.5, k * (med_sec - e.sectional_600)))
+        else:
+            t["sectional"] = 0.0
         afs = e.extras.get("afs")
         t["late speed"] = (p.k_late * (afs - afs_mean) / afs_sd
                            if afs is not None and afs_mean is not None and afs_sd > 1e-6 else 0.0)

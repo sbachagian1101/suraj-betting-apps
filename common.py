@@ -18,6 +18,8 @@ from typing import Callable, Optional
 
 import requests
 
+BUILD = "2026-09-07c"      # bumped with every change; app.py refuses a stale copy
+
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/128.0 Safari/537.36")
 

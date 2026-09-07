@@ -12,6 +12,8 @@ import rs_paste
 from common import MARKET_FIELDS, RaceCard, SourceError, merge_cards
 from sources import betfair, hkjc, hrn, ladbrokes, pmu, sportinglife, winningform
 
+BUILD = "2026-09-07c"      # bumped with every change; app.py refuses a stale copy
+
 #: which adapters serve which country, in merge order (first = base when there is no paste field)
 PLAN: dict[str, list] = {
     "AUS": [ladbrokes, betfair],

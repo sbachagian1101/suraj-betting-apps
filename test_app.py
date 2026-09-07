@@ -86,6 +86,59 @@ def test_speed_map_paste_parses_pace_values():
     assert idn.venue == "Canberra" and idn.race_no == 5 and idn.dist_m == 1400
 
 
+def test_enhanced_form_paste_with_speed_map_appended():
+    raw = read("rs_tatura_r4_2026-09-07_enhanced_speedmap.txt")
+    form, speed = rs_paste.split_speed_map(raw)
+    assert rs_paste.page_type(form) == "enhanced" and rs_paste.page_type(speed) == "speed"
+    idn, card = rs_paste.parse_paste(raw)
+    # plain-text copy: no URLs, identity comes from the glued breadcrumb + header
+    assert idn.country == "AUS" and idn.venue == "Tatura" and idn.race_no == 4
+    assert idn.race_date == date(2026, 9, 7) and idn.dist_m == 1450 and idn.going == "SOFT"
+    assert idn.race_type == "BM56" and idn.prize == 22000.0 and idn.start_time == "15:00"
+    assert len(card.entries) == 10 and len(card.field_) == 8
+    e = card.find(1, "Real Alliance")
+    assert e.weight == 63.0 and e.barrier == 8 and e.jockey == "Brad Rawiller" and e.sex == "M" and e.age == 7
+    assert e.odds == 6.0 and e.career == (35, 7, 5, 0) and e.records["Soft"] == (11, 4, 1, 0)
+    assert e.jockey_stats == (50, 6, 17) and e.trainer_stats == (50, 1, 12) and e.combo_stats[0] == 719
+    assert e.last_run_days == 27 and e.official_rating == 64 and e.prize_money == 171000.0
+    assert len(e.runs) == 5
+    r0 = e.runs[0]
+    assert r0.run_date == date(2026, 8, 11) and r0.track == "BALLARAT" and r0.dist_m == 1500
+    assert r0.surface == "AW" and r0.pos == 5 and r0.field_size == 8 and r0.margin_l == 5.3
+    assert r0.sectional == 36.65 and r0.running_pos == "8 7 5" and r0.sp == 6.5 and r0.rating == 64
+    assert e.sectional_600 == 36.65 and e.extras["sectional_source"] == "R&S L600m"
+    assert 0.8 < e.extras["settle_frac"] <= 1.0          # settles at the back
+    pomah = card.find(2, "Pomah")
+    assert pomah.runs[0].pos == 1 and pomah.runs[0].margin_l == -1.8      # winner: margin credited
+    assert card.find(3, "Queen Of Tuscany").scratched and card.find(3, "Queen Of Tuscany").odds is None
+    # the appended Speed Map page is picked up separately
+    rows = rs_paste.parse_speed_map(speed)
+    assert len(rows) == 8 and rows[9].aes == 17.5 and rows[1].bp == 6
+    rated, _ = M.rate(card, M.defaults_for("AUS"))
+    assert len(rated) == 8 and sum(r.p_final for r in rated) == pytest.approx(1.0)
+
+
+def test_pipeline_enhanced_paste_is_the_base(monkeypatch):
+    def fail(*a, **k):
+        raise common.SourceError("offline")
+    monkeypatch.setattr(pipeline.ladbrokes, "fetch", fail)
+    monkeypatch.setattr(pipeline.betfair, "fetch", fail)
+    A = pipeline.analyse(read("rs_tatura_r4_2026-09-07_enhanced_speedmap.txt"))
+    assert A.card.venue == "Tatura" and A.card.race_no == 4 and len(A.rows) == 8
+    by = {r.number: r for r in A.rows}
+    assert by[9].entry.extras["aes"] == 17.5 and by[1].entry.barrier == 6    # Speed Map barrier wins
+    assert by[1].used_runs == 5 and by[9].speed_score == pytest.approx(1.0)
+    assert any("Speed Map paste" in n for n in A.notes)
+
+
+def test_helper_builds_match_app():
+    src = io.open(os.path.join(HERE, "app.py"), encoding="utf-8").read()
+    build = re.search(r'^BUILD = "([^"]+)"', src, re.M).group(1)
+    import charts
+    for mod in (pipeline, M, charts, rs_paste, common):
+        assert mod.BUILD == build, mod.__name__
+
+
 def test_speed_map_absent_from_full_fields():
     assert not rs_paste.has_speed_map(read("rs_deauville_r1_2026-09-01.txt"))
     assert rs_paste.parse_speed_map(read("rs_grafton_r2_2026-09-07_header.txt")) == {}

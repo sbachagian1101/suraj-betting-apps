@@ -16,9 +16,14 @@ venue, date and race number (`/thoroughbred/australia/grafton/2026-09-07/R2`), a
 header carries the distance line, class, prize and start time. Both the plain select-all
 copy and the Markdown export (`* [Race 2](...)`, pipe tables) are accepted.
 
-When the paste is a **Full Fields** page the vendored `rs_parser` also reads each runner's
-last-10 run table, which becomes the richest Australian form source. A header-only paste is
-normal: the runners then come from the feeds.
+When the paste is a **Full Fields** page the vendored `rs_parser` reads each runner's
+last-10 run table. When it is an **Enhanced Form** page the vendored `rs_enhanced` (from the
+RaceSim app) reads the field table, each runner's jockey/trainer/combination last-50 records,
+the filter records (career, course, distance, going, surface, first-up), OHR, days since the
+last run, and every recent run with margin, class, prize, weight, barrier, SP, race time,
+**L600m sectional** and the settling / 800 m / turn positions. Settling positions feed the
+early-speed score and the best recent L600m feeds a (half-weight, capped) sectional term.
+A header-only paste is normal: the runners then come from the feeds.
 
 The optional second box takes the R&S **Speed Map** page. Its Pace Values table gives each
 runner's AES (average early speed), AFS (average finishing speed), JR (jockey rating) and the

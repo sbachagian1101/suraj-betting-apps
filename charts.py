@@ -7,6 +7,8 @@ import plotly.graph_objects as go
 
 from model import Rated, SimResult
 
+BUILD = "2026-09-07c"      # bumped with every change; app.py refuses a stale copy
+
 PALETTE = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626", "#7c3aed", "#0891b2", "#be185d",
            "#4d7c0f", "#b45309", "#1d4ed8", "#0f766e", "#9333ea", "#c2410c", "#475569",
            "#65a30d", "#db2777", "#0369a1", "#a16207", "#7e22ce", "#334155"]

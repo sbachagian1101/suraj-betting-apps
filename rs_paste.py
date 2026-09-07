@@ -16,8 +16,20 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Optional
 
+import rs_enhanced
 import rs_parser
 from common import CURRENCY, Entry, PastRun, RaceCard, days_between
+
+BUILD = "2026-09-07c"      # bumped with every change; app.py refuses a stale copy
+
+COUNTRY_NAMES = {
+    "Australia": "AUS", "France": "FR", "United Kingdom": "UK", "Great Britain": "UK",
+    "England": "UK", "Scotland": "UK", "Wales": "UK", "Ireland": "IRE", "Hong Kong": "HK",
+    "South Africa": "SA", "USA": "USA", "United States": "USA",
+}
+_RE_CRUMB = re.compile(r"Form Guide(?:Greyhound|Thoroughbred|Harness)(" + "|".join(
+    re.escape(k) for k in sorted(COUNTRY_NAMES, key=len, reverse=True)) + r")(.+?) RacesRace\s*(\d+)")
+_RE_SPEED_TITLE = re.compile(r"(?m)^.*Form Guide\s*\(Race\s*\d+\)\s*\|\s*Speed Map.*$")
 
 COUNTRY_SLUGS = {
     "australia": "AUS", "france": "FR", "united-kingdom": "UK", "uk": "UK",
@@ -132,6 +144,12 @@ def identity(raw: str) -> Identity:
                 pass
         if m.group("race") and idn.race_no is None:
             idn.race_no = int(m.group("race"))
+    # plain-text copies carry no URLs; the glued breadcrumb still names country, venue, race
+    cb = _RE_CRUMB.search(text)
+    if cb:
+        idn.country = idn.country or COUNTRY_NAMES[cb.group(1)]
+        idn.venue = idn.venue or cb.group(2).strip().title()
+        idn.race_no = idn.race_no or int(cb.group(3))
     lines = [ln.strip() for ln in clean_markdown(text).split("\n")]
     seen_time = False
     for i, s in enumerate(lines[:200]):
@@ -329,8 +347,158 @@ def apply_speed_map(card: RaceCard, rows: dict[int, SpeedRow]) -> int:
     return n
 
 
+# --- Enhanced Form page --------------------------------------------------------
+
+def page_type(raw: str) -> str:
+    """'enhanced', 'full', 'speed' or '' from the page title line."""
+    m = re.search(r"Form Guide\s*\(Race\s*\d+\)\s*\|\s*([A-Za-z ]+)", raw or "")
+    if not m:
+        return ""
+    t = m.group(1).strip().lower()
+    if t.startswith("enhanced"):
+        return "enhanced"
+    if t.startswith("full"):
+        return "full"
+    if t.startswith("speed"):
+        return "speed"
+    return ""
+
+
+def split_speed_map(raw: str) -> tuple[str, str]:
+    """A paste that carries the Speed Map page after another page -> (form, speed)."""
+    text = (raw or "").replace("\r\n", "\n")
+    m = _RE_SPEED_TITLE.search(text)
+    if not m:
+        return text, ""
+    # the breadcrumb line sits just above the title; keep it for identity()
+    cut = text.rfind("\n", 0, max(m.start() - 1, 0))
+    cut = text.rfind("\n", 0, cut) if cut > 0 else 0
+    return text[:max(cut, 0)], text[max(cut, 0):]
+
+
+_MONTHS_LONG = {m: i for i, m in enumerate(
+    "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(), start=1)}
+
+
+def _date_from(text: str) -> Optional[date]:
+    m = re.match(r"^\s*(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})", text or "")
+    if not m or m.group(2).title() not in _MONTHS_LONG:
+        return None
+    try:
+        return date(int(m.group(3)), _MONTHS_LONG[m.group(2).title()], int(m.group(1)))
+    except ValueError:
+        return None
+
+
+_FILTER_KEYS = {"Car": "Career", "12m": "Last 12m", "Crs": "Course", "Dist": "Dist",
+                "Crs & Dist": "C&D", "Firm": "Firm", "Good": "Good", "Soft": "Soft",
+                "Heavy": "Heavy", "AW": "AW", "Turf": "Turf", "FU": "First Up", "2U": "Second Up"}
+
+
+def _stats(win, plc, n) -> Optional[tuple[int, int, int]]:
+    try:
+        n = int(n or 0)
+    except (TypeError, ValueError):
+        return None
+    if n <= 0 or win is None:
+        return None
+    return (n, int(round(float(win) * n)), int(round(float(plc or 0) * n)))
+
+
+def enhanced_to_card(header: dict, runners: list[dict], idn: Identity, race_day: Optional[date]) -> RaceCard:
+    card = RaceCard(country=idn.country, venue=idn.venue or header.get("track", ""),
+                    race_no=idn.race_no or header.get("race_no"), race_date=race_day,
+                    name=idn.race_name or header.get("race_name", ""),
+                    dist_m=idn.dist_m or header.get("distance_m"),
+                    surface=idn.surface or header.get("surface", ""), going=idn.going or header.get("going", ""),
+                    race_class=idn.race_type or header.get("race_type", ""), prize=idn.prize,
+                    currency=idn.currency, start_time=idn.start_time or header.get("time", ""),
+                    sources=["Racing & Sports paste (Enhanced Form)"])
+    for r in runners:
+        detailed = bool(r.get("recent_runs")) or r.get("jky_n") is not None
+        sex = {"GELDING": "G", "HORSE": "H", "MARE": "M", "FILLY": "F", "COLT": "C"}.get(
+            str(r.get("sex") or "").upper(), str(r.get("sex") or "")[:1].upper())
+        e = Entry(number=r.get("tab"), name=str(r.get("horse", "")).title(), weight=r.get("wt") or None,
+                  barrier=(r.get("bp_block") or r.get("bp") or None), jockey=str(r.get("jockey") or "").title(),
+                  trainer=str(r.get("trainer") or "").title(), age=r.get("age") or None, sex=sex,
+                  scratched=bool(r.get("scratched")), form_string=str(r.get("form") or ""),
+                  gear="", sources=["Racing & Sports paste (Enhanced Form)"])
+        px = r.get("tab_odds") or r.get("bf_odds")
+        if px and 1.0 < float(px) < 900:
+            e.odds = float(px)
+            e.extras["price_book"] = r.get("price_book") or r.get("price_source") or ""
+        if detailed:
+            e.jockey_stats = _stats(r.get("jky_win"), r.get("jky_place"), r.get("jky_n"))
+            e.trainer_stats = _stats(r.get("trn_win"), r.get("trn_place"), r.get("trn_n"))
+            e.combo_stats = _stats(r.get("jt_win"), r.get("jt_place"), r.get("jt_n"))
+            if r.get("dslr") is not None:
+                e.last_run_days = int(r["dslr"])
+            if r.get("ohr"):
+                e.official_rating = float(r["ohr"])
+            for key, label in _FILTER_KEYS.items():
+                v = (r.get("filters") or {}).get(key)
+                if v and len(v) == 3:
+                    wins, places, starts = (int(x) for x in v)
+                    e.records[label] = (starts, wins, places, 0)
+            if e.records.get("Career"):
+                e.career = e.records["Career"]
+            pm = str((r.get("facts") or {}).get("Car PM") or "")
+            mm = re.match(r"\$([\d.,]+)(k?)", pm)
+            if mm:
+                e.prize_money = float(mm.group(1).replace(",", "")) * (1000 if mm.group(2) else 1)
+            settles = []
+            for run in r.get("recent_runs") or []:
+                d = _date_from(str(run.get("date") or ""))
+                fin, fs = run.get("finish"), run.get("field_size")
+                pr = PastRun(run_date=d, days_ago=run.get("days_ago") if run.get("days_ago") is not None
+                             else days_between(race_day, d),
+                             track=str(run.get("track") or ""), race_class=str(run.get("race_class") or ""),
+                             prize=run.get("prize") or None, currency="AUD", dist_m=run.get("distance") or None,
+                             surface={"T": "TURF", "AW": "AW", "S": "SAND", "D": "DIRT"}.get(
+                                 str(run.get("surface") or "").upper(), str(run.get("surface") or "").upper()),
+                             going={"G": "GOOD", "S": "SOFT", "H": "HEAVY", "F": "FIRM", "N": "STANDARD"}.get(
+                                 str(run.get("going") or "").upper(), str(run.get("going") or "")),
+                             pos=fin or None, field_size=fs or None, weight=run.get("weight") or None,
+                             barrier=run.get("bp") or None, jockey=str(run.get("jockey") or "").title(),
+                             sp=run.get("sp") or None, time_s=run.get("race_time_s") or None,
+                             sectional=run.get("sec600_s") or None, comment=str(run.get("comment") or ""),
+                             rating=run.get("ohr") or None)
+                mg = run.get("margin")
+                if fin and mg is not None:
+                    pr.margin_l = -float(mg) if fin == 1 else float(mg)
+                elif not fin:
+                    pr.non_finish = True
+                rp = [str(run.get(k)) for k in ("settle_pos", "pos_800", "turn_pos") if run.get(k)]
+                pr.running_pos = " ".join(rp)
+                if run.get("tempo"):
+                    pr.comment = f"[{run['tempo']}] " + pr.comment
+                if run.get("settle_pos") and fs and fs > 1:
+                    settles.append((int(run["settle_pos"]) - 1) / (fs - 1))
+                e.runs.append(pr)
+            if settles:
+                e.extras["settle_frac"] = sum(settles[:4]) / len(settles[:4])
+            secs = [x.sectional for x in e.runs[:3] if x.sectional]
+            if secs:
+                e.sectional_600 = min(secs)
+                e.extras["sectional_source"] = "R&S L600m"
+            if e.runs and e.last_run_days is None:
+                ds = [x.days_ago for x in e.runs if x.days_ago is not None]
+                e.last_run_days = min(ds) if ds else None
+        card.entries.append(e)
+    return card
+
+
 def parse_paste(raw: str) -> tuple[Identity, RaceCard]:
-    idn = identity(raw)
-    race = rs_parser.parse(clean_markdown(raw))
+    form_text, _speed = split_speed_map(raw or "")
+    idn = identity(form_text or raw or "")
+    kind = page_type(form_text)
+    if kind == "enhanced":
+        header, runners, warns = rs_enhanced.parse(form_text)
+        card = enhanced_to_card(header, runners, idn, idn.race_date)
+        card.warnings = [w for w in warns if "Could not locate" in w]
+        if not card.entries:
+            card.notes.append("The Enhanced Form paste carried no field table; runners come from the feeds.")
+        return idn, card
+    race = rs_parser.parse(clean_markdown(form_text))
     card = to_card(race, idn)
     return idn, card

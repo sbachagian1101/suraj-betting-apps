@@ -19,6 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # Streamlit Cloud has served a new app.py against a cached old helper module
 # more than once.  The required-name list is DERIVED from this file so it cannot
 # drift: every `module.name` reference below is checked against the live module.
+BUILD = "2026-09-07c"      # every helper module carries the same string; a mismatch = stale copy
 _src = io.open(__file__, encoding="utf-8").read()
 _REQUIRED = {m: sorted(set(re.findall(rf"\b{m}\.([A-Za-z_]\w*)", _src)))
              for m in ("pipeline", "model", "charts", "rs_paste", "common")}
@@ -30,6 +31,10 @@ for _mod, _names in _REQUIRED.items():
         _missing.append(f"{_mod} (import failed: {type(_e).__name__}: {_e})")
         continue
     _missing += [f"{_mod}.{n}" for n in _names if not hasattr(_m, n)]
+    # a name can exist with an old signature (analyse() without speed_raw did exactly
+    # that on 7 Sep 2026), so every helper also carries a build stamp
+    if getattr(_m, "BUILD", None) != BUILD:
+        _missing.append(f"{_mod} (build {getattr(_m, 'BUILD', 'none')} ≠ {BUILD})")
 if _missing:
     st.error("**This deployment is running stale code.** Missing: `" + "`, `".join(_missing)
              + "`. Streamlit Cloud pulled the new files but kept an old module in memory. "
@@ -63,9 +68,10 @@ with st.sidebar:
     country_name = st.selectbox("Race country", COUNTRIES, index=0)
     venue = st.text_input("Race venue", placeholder="Grafton")
     race_no = st.number_input("Race no", min_value=1, max_value=20, value=1, step=1)
-    st.markdown("**Paste the Racing & Sports page** (Full Fields tab, select-all → copy). "
-                "The breadcrumb links inside it identify the race, so the fields above are "
-                "only needed when you paste nothing.")
+    st.markdown("**Paste the Racing & Sports page** (Full Fields or Enhanced Form tab, "
+                "select-all → copy). The breadcrumb inside it identifies the race, so the fields "
+                "above are only needed when you paste nothing. The Speed Map page can be pasted "
+                "underneath it or in the second box.")
     if st.button("Load sample paste (Grafton R2, 7 Sep 2026)"):
         st.session_state["raw"] = io.open(SAMPLE, encoding="utf-8").read()
     raw = st.text_area("Racing & Sports paste", key="raw", height=220,
