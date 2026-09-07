@@ -356,6 +356,9 @@ with tab_board:
             "Leagues on the board", all_leagues, default=default, key="board_leagues",
             help="Every scheduled match of the day in these leagues is tracked.")
         horizon = c2.slider("Only matches within (hours)", 1, 24, 24, key="board_horizon")
+        only_odds = c2.toggle("Only matches with odds", value=True, key="board_only_odds",
+                              help="Hides matches the book has not priced. They appear "
+                                   "automatically once odds turn up on a refresh.")
         start = c3.button("Start / update board", type="primary", width="stretch", key="board_start")
         stop = c3.button("Stop board", width="stretch", key="board_stop")
         st.caption("Refresh: every 60 min beyond 3 h from kick-off, 30 min within 3 h, 15 min within "
@@ -380,16 +383,23 @@ with tab_board:
             if not rows:
                 st.info("The board is empty. Pick leagues and press **Start / update board**.")
                 return
-            m1, m2, m3, m4, m5 = st.columns(5)
+            priced = [r for r in rows if r.analysis is not None and r.analysis.odds]
+            shown = priced if only_odds else rows
+            m1, m2, m3, m4, m5, m6 = st.columns(6)
             m1.metric("Matches", S["total"])
             m2.metric("Predicted", S["computed"])
-            m3.metric("Errors", S["errors"])
-            m4.metric("Worker", "running" if S["running"] else "stopped")
+            m3.metric("With odds", len(priced))
+            m4.metric("Errors", S["errors"])
+            m5.metric("Worker", "running" if S["running"] else "stopped")
             nxt = S["next_due"]
-            m5.metric("Next refresh", f"in {max(0, int((nxt - now).total_seconds() // 60))} min" if nxt else "—")
+            m6.metric("Next refresh", f"in {max(0, int((nxt - now).total_seconds() // 60))} min" if nxt else "—")
             if S["busy_with"]:
                 st.caption(f"Computing {S['busy_with']}…")
-            df = board_frame(rows, now)
+            if not shown:
+                st.info("No priced matches yet. Unpriced ones stay hidden while the toggle is on "
+                        "and appear as soon as the book prices them.")
+                return
+            df = board_frame(shown, now)
             show = df.drop(columns=["id"])
             ev = st.dataframe(
                 style_board(show), hide_index=True, width="stretch", height=min(520, 60 + 36 * len(show)),
