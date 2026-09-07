@@ -277,8 +277,9 @@ def _odds_with_gap(pred, side, gap):
     p = {"home": pred.p_home, "draw": pred.p_draw, "away": pred.p_away}
     imp = {side: p[side] - gap}
     others = [k for k in p if k != side]
-    for k in others:
-        imp[k] = (1 - imp[side]) / 2
+    rest = sum(p[k] for k in others)
+    for k in others:                      # remaining mass in the model's proportions,
+        imp[k] = (1 - imp[side]) * p[k] / rest   # so their gaps are negative and ``side`` is biggest
     return {k: 1 / v for k, v in imp.items()}
 
 
