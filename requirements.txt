@@ -1,4 +1,4 @@
-# Touching this file makes Streamlit Cloud rebuild from scratch (clears stale modules).
+# Touching this file makes Streamlit Cloud rebuild from scratch (clears stale modules). rev 2
 streamlit>=1.50,<2
 pandas>=2.2,<3
 requests>=2.31
