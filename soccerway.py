@@ -265,13 +265,16 @@ def _tokens(name: str) -> set[str]:
     return set(normalise_league(name).split())
 
 
-def select_leagues(queries: list[str], matches: list[Match]) -> tuple[dict[str, str], list[str]]:
+def select_leagues(queries: list[str], matches: list[Match],
+                   strict: bool = False) -> tuple[dict[str, str], list[str]]:
     """Match user-typed league lines against the competitions present.
 
     Returns ({query: competition}, [unmatched queries]). A query matches when
     every one of its tokens appears in the competition name (so 'Premier
     League' alone would match several; the country disambiguates) - the
-    competition with the fewest extra tokens wins.
+    competition with the fewest extra tokens wins. With ``strict`` only an
+    exact (normalised) name matches: no extra tokens, no misspelling
+    tolerance - used for defaults, where 'Ligue 1' must not become 'Ligue 2'.
     """
     comps = sorted({m.competition for m in matches if m.competition})
     comp_tokens = {c: _tokens(c) for c in comps}
@@ -282,6 +285,13 @@ def select_leagues(queries: list[str], matches: list[Match]) -> tuple[dict[str, 
             continue
         qt = _tokens(q)
         if not qt:
+            continue
+        if strict:
+            exact = [c for c in comps if normalise_league(c) == normalise_league(q)]
+            if exact:
+                found[q] = exact[0]
+            else:
+                missing.append(q)
             continue
         candidates = [(len(comp_tokens[c] - qt), c) for c in comps if qt <= comp_tokens[c]]
         if not candidates:

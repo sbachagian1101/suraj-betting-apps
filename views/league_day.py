@@ -278,9 +278,9 @@ def board_frame(rows, now: datetime) -> pd.DataFrame:
         every = refresh_minutes(m.kickoff, now)
         out.append(base | {
             "Home %": round(p.p_home * 100), "Draw %": round(p.p_draw * 100), "Away %": round(p.p_away * 100),
-            "vs book H": round((p.p_home - imp["home"]) * 100, 1) if imp else None,
-            "vs book D": round((p.p_draw - imp["draw"]) * 100, 1) if imp else None,
-            "vs book A": round((p.p_away - imp["away"]) * 100, 1) if imp else None,
+            "vs book H": round((p.p_home - imp["home"]) * 100, 1) if imp else float("nan"),
+            "vs book D": round((p.p_draw - imp["draw"]) * 100, 1) if imp else float("nan"),
+            "vs book A": round((p.p_away - imp["away"]) * 100, 1) if imp else float("nan"),
             "Selection / prediction": sig["label"] if sig else "no odds",
             "Odds H/D/A": (f"{A.odds['home']:.2f}/{A.odds['draw']:.2f}/{A.odds['away']:.2f}"
                            if A.odds else ""),
@@ -327,7 +327,7 @@ with tab_board:
         upcoming = {m.competition for m in idx.matches if m.stage == "1"}
         # default: the leagues typed on the Whole day tab if they play today, else the
         # first few top-flight-looking ones (no youth, women's, amateur or regional tiers)
-        typed = SW.select_leagues(DEFAULT_LEAGUES.splitlines(), idx.matches)[0].values()
+        typed = SW.select_leagues(DEFAULT_LEAGUES.splitlines(), idx.matches, strict=True)[0].values()
         default = [l for l in dict.fromkeys(typed) if l in upcoming]
         if not default:
             skip = ("U19", "U20", "U21", "U23", "Women", "Amateur", "Reserve", "Youth", "Regional",

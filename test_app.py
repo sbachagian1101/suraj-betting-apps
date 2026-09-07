@@ -127,6 +127,16 @@ def test_select_leagues_matches_loosely_and_reports_misses():
     assert missing == ["GERMANY: Bundesliga"]
 
 
+def test_select_leagues_strict_needs_exact_name():
+    ms = SW._parse_matches(_daily_feed())
+    found, missing = SW.select_leagues(
+        ["ENGLAND: Premier League", "England premier league", "FRANCE: Ligue 2", "premier league"],
+        ms, strict=True)
+    assert found == {"ENGLAND: Premier League": "ENGLAND: Premier League",
+                     "England premier league": "ENGLAND: Premier League"}   # case/punctuation only
+    assert missing == ["FRANCE: Ligue 2", "premier league"]                 # no fuzz, no partials
+
+
 def test_history_before_excludes_fixture_and_later_matches():
     ms = SW._parse_matches(_results_html(), "MBUGcjb9")
     fixture = next(m for m in ms if m.id == "nHJfzC2N")
