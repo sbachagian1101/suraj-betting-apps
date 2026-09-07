@@ -39,6 +39,42 @@ def select_board_matches(matches: list[SW.Match], leagues: set[str], horizon_hou
     return sorted(out, key=lambda x: x.kickoff)
 
 
+HOURS = [f"{h:02d}:00" for h in range(25)]          # 00:00 .. 24:00 (Mauritius time)
+
+
+def in_window(m: SW.Match, from_hour: int, to_hour: int) -> bool:
+    """Kick-off (Mauritius time) between from_hour:00 and to_hour:00 inclusive."""
+    t = SW.to_mu(m.kickoff)
+    minutes = t.hour * 60 + t.minute
+    return from_hour * 60 <= minutes <= to_hour * 60
+
+
+def sidebar_filters(board_leagues: list[str]) -> tuple[set[str], int, int]:
+    """Sidebar controls: which of the board's leagues to show, and the time window.
+    Returns (leagues shown, from hour, to hour)."""
+    with st.sidebar:
+        st.markdown("**Live board filters**")
+        removed = st.session_state.setdefault("board_removed_leagues", set())
+        default = [l for l in board_leagues if l not in removed]
+        if board_leagues:
+            shown = st.multiselect("Leagues on the board (close the ones you do not want)",
+                                   board_leagues, default=default,
+                                   help="Removing a league here only hides its rows; the worker "
+                                        "keeps tracking it. Re-add it any time.")
+            st.session_state["board_removed_leagues"] = set(board_leagues) - set(shown)
+        else:
+            shown = []
+            st.caption("No leagues on the board yet.")
+        c1, c2 = st.columns(2)
+        f = c1.selectbox("From (MU)", HOURS[:-1], index=0, key="board_from")
+        t = c2.selectbox("To (MU)", HOURS[1:], index=23, key="board_to")
+        from_hour, to_hour = int(f[:2]), int(t[:2])
+        if to_hour <= from_hour:
+            st.warning("'To' must be after 'From'; showing the whole day.")
+            from_hour, to_hour = 0, 24
+    return set(shown), from_hour, to_hour
+
+
 def starts_in(m: SW.Match, now: datetime) -> str:
     if m.stage == "3":
         return "FT"
@@ -192,8 +228,11 @@ def render(D, n_rates: int, n_lineup: int) -> None:
 
     st.session_state.setdefault("board_notified", set())
     now0 = datetime.now(timezone.utc)
-    fast = any(alerts.imminent(r.match, now0) for r in BOARD.snapshot())
+    snapshot0 = BOARD.snapshot()
+    fast = any(alerts.imminent(r.match, now0) for r in snapshot0)
     st.session_state["board_fast"] = fast
+    leagues_shown, from_hour, to_hour = sidebar_filters(
+        sorted({r.match.competition for r in snapshot0}))
 
     @st.fragment(run_every=FAST_REDRAW if fast else SLOW_REDRAW)
     def board_table():
@@ -205,6 +244,8 @@ def render(D, n_rates: int, n_lineup: int) -> None:
             return
         priced = [r for r in rows if r.analysis is not None and r.analysis.odds]
         shown = priced if only_odds else rows
+        shown = [r for r in shown if r.match.competition in leagues_shown
+                 and in_window(r.match, from_hour, to_hour)]
         shown_matches = [r.match for r in shown]
         imminent_ids = {m.id for m in shown_matches if alerts.imminent(m, now)}
         started_ids = {m.id for m in shown_matches if alerts.started(m, now)}
@@ -232,11 +273,15 @@ def render(D, n_rates: int, n_lineup: int) -> None:
         m6.metric("Worker", "running" if S["running"] else "stopped")
         nxt = S["next_due"]
         m7.metric("Next refresh", f"in {max(0, int((nxt - now).total_seconds() // 60))} min" if nxt else "—")
-        if S["busy_with"]:
-            st.caption(f"Computing {S['busy_with']}…")
+        done, total = S["computed"], S["total"]
+        st.progress(done / total if total else 0.0,
+                    text=f"{done} out of {total} matches computed ({done / total:.0%})"
+                         + (f" · computing {S['busy_with']}…" if S["busy_with"] else
+                            (" · all done, refreshing on schedule" if done >= total else "")))
         if not shown:
-            st.info("No priced matches yet. Unpriced ones stay hidden while the toggle is on "
-                    "and appear as soon as the book prices them.")
+            st.info("Nothing to show with the current filters: the odds toggle, the leagues "
+                    "shown and the time window in the sidebar. Unpriced matches appear as "
+                    "soon as the book prices them.")
             return
         df = board_frame(shown, now)
         blink_on = int(time.time()) % 2 == 0

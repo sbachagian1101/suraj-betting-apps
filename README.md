@@ -52,6 +52,10 @@ Soccerway and Flashscore share team ids, so a Flashscore team link
     `charts.py` (plotly), the tab itself in `board_ui.py`. The **Only matches with odds**
     toggle (on by default) hides unpriced matches; the filter is applied when the table
     redraws, so a match appears by itself once the book prices it on a later refresh.
+    A progress bar reads "N out of M matches computed" while the worker fills the board.
+    The sidebar gains **Live board filters**: the leagues currently on the board as chips
+    (close one to hide its rows; the worker keeps tracking it) and a **From / To** time
+    window in Mauritius time at one-hour steps.
     **Kick-off alerts** (`alerts.py`): when a listed match comes within 5 minutes of
     kick-off the bell beeps once (a short WAV via `st.audio(autoplay=True)`), a bell banner
     names the match, and its row blinks pale purple (the table redraws once a second and

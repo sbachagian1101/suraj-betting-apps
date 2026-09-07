@@ -475,6 +475,17 @@ def test_board_computes_due_rows_with_fake_compute(monkeypatch):
     assert all(r.next_due is None for r in bd2.snapshot())
 
 
+def test_time_window_uses_mauritius_hours():
+    import board_ui as BU
+    m = _match(0, "h", "a", None, None)
+    m.kickoff = datetime(2026, 9, 7, 17, 0, tzinfo=timezone.utc)     # 21:00 Mauritius
+    assert BU.in_window(m, 10, 22) and BU.in_window(m, 21, 24) and BU.in_window(m, 0, 21)
+    assert not BU.in_window(m, 10, 15) and not BU.in_window(m, 22, 24)
+    m.kickoff = datetime(2026, 9, 7, 6, 30, tzinfo=timezone.utc)     # 10:30 Mauritius
+    assert BU.in_window(m, 10, 15) and not BU.in_window(m, 11, 15)
+    assert BU.HOURS[0] == "00:00" and BU.HOURS[-1] == "24:00" and len(BU.HOURS) == 25
+
+
 def test_board_keeps_started_matches_and_predicts_finished_ones_once(monkeypatch):
     import time as _t
     import board as B
