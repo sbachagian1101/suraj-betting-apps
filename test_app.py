@@ -379,6 +379,77 @@ def test_on_day_trims_the_feed_padding():
     assert len(P.on_day(ms, date(2026, 9, 6), -14)) == 3
 
 
+def test_refresh_tiers():
+    import board as B
+    now = datetime(2026, 9, 7, 12, 0, tzinfo=timezone.utc)
+    from datetime import timedelta as td
+    assert B.refresh_minutes(now + td(minutes=20), now) == 5
+    assert B.refresh_minutes(now + td(minutes=30), now) == 5
+    assert B.refresh_minutes(now + td(minutes=45), now) == 15
+    assert B.refresh_minutes(now + td(minutes=60), now) == 15
+    assert B.refresh_minutes(now + td(hours=2), now) == 30
+    assert B.refresh_minutes(now + td(hours=3), now) == 30
+    assert B.refresh_minutes(now + td(hours=5), now) == 60
+    assert B.refresh_minutes(now - td(minutes=1), now) is None
+
+
+def test_board_computes_due_rows_with_fake_compute(monkeypatch):
+    import time as _t
+    import board as B
+    import pipeline as P
+    calls = []
+
+    def fake_compute(m, n_rates, n_lineup):
+        calls.append(m.id)
+        a = M.profile(m.home_name, _records("h", [1.5] * 3, [1.0] * 3, [{"p": 7.0}] * 3))
+        b = M.profile(m.away_name, _records("a", [1.2] * 3, [1.3] * 3, [{"p": 6.8}] * 3))
+        return P.Analysis(m, P.TeamData("h", m.home_id, m.home_name, a.records),
+                          P.TeamData("a", m.away_id, m.away_name, b.records),
+                          a, b, None, None, M.predict(a, b), None, n_rates, n_lineup)
+
+    monkeypatch.setattr(B, "daily_cached", lambda *a, **k: [])      # no network for status refresh
+    monkeypatch.setattr(B, "LOOP_SLEEP", 0.05)
+    ms = SW._parse_matches(_daily_feed())
+    scheduled = [m for m in ms if m.stage == "1"]
+    bd = B.Board(compute=fake_compute)
+    bd.configure(scheduled, 8, 4, 0, 4)
+    deadline = _t.time() + 10
+    while _t.time() < deadline and bd.status()["computed"] < len(scheduled):
+        _t.sleep(0.1)
+    bd.stop()
+    S = bd.status()
+    assert S["computed"] == len(scheduled) == 2 and S["errors"] == 0
+    assert sorted(calls) == sorted(m.id for m in scheduled)
+    rows = bd.snapshot()
+    assert all(r.analysis is not None and r.next_due is None for r in rows)   # kick-offs are in the past -> frozen
+    # reconfiguring with the same windows keeps the computed predictions
+    bd.configure(scheduled, 8, 4, 0, 4)
+    bd.stop()
+    assert bd.status()["computed"] == 2
+    # a finished match is never queued
+    fin = [m for m in ms if m.stage == "3"]
+    bd2 = B.Board(compute=fake_compute)
+    bd2.configure(fin, 8, 4, 0, 4)
+    _t.sleep(0.3)
+    bd2.stop()
+    assert bd2.status()["computed"] == 0
+
+
+def test_charts_build_from_an_analysis():
+    import charts as C
+    import pipeline as P
+    m = _match(0, "h", "a", 1, 0)
+    a = M.profile("Home", _records("h", [1.5] * 3, [1.0] * 3, [{"p": 7.0}] * 3))
+    b = M.profile("Away", _records("a", [1.2] * 3, [1.3] * 3, [{"p": 6.8}] * 3))
+    pred = M.predict(a, b)
+    odds = {"home": 2.1, "draw": 3.4, "away": 3.6, "home_open": 2.1, "draw_open": 3.4, "away_open": 3.6}
+    A = P.Analysis(m, P.TeamData("h", "h", "Home", a.records), P.TeamData("a", "a", "Away", b.records),
+                   a, b, None, None, pred, odds, 3, 3)
+    for fig in (C.model_vs_book(A), C.outcome_pie(A), C.score_heatmap(A), C.xg_history(A)):
+        assert fig.to_dict()["data"]
+    assert C.rating_bars(A) is None
+
+
 def test_day_index_splits_country_and_league():
     import pipeline as P
     ms = SW._parse_matches(_daily_feed())

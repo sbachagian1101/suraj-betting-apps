@@ -39,6 +39,16 @@ Soccerway and Flashscore share team ids, so a Flashscore team link
     leagues: a summary table (CSV download) plus one expander per match with the same
     breakdown as the two-team page. Budget about 10 seconds per match.
 
+  * **Live board**: pick leagues (every scheduled match of the day in them goes on the
+    board) and a background worker inside the server keeps the predictions fresh on a
+    tiered schedule: every 60 min beyond 3 h from kick-off, 30 min within 3 h, 15 min
+    within 1 h, 5 min within 30 min. Started matches are frozen (score and status keep
+    updating every 5 min). The table has start time, starts-in, country, league, match,
+    Home/Draw/Away %, the three model-minus-book gaps and the selection; it redraws every
+    30 s. Click a row for charts (model v book bars, 1X2 pie, scoreline heatmap, recent xG
+    history, XI ratings) and the insights. The worker lives in `board.py`, charts in
+    `charts.py` (plotly).
+
   Only matches played *before* each fixture count as its history, so finished matches are
   predicted pre-match and shown against the actual score. Both teams are fetched in
   parallel and team data is cached for ten minutes, so re-runs are fast.

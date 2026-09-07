@@ -25,7 +25,10 @@ _NEEDED = {
               "bet_signal", "BET_MIN_EDGE", "BET_MAX_EDGE"],
     "pipeline": ["analyse_pair", "analyse_fixture", "daily_cached", "latest_match",
                  "on_day", "DayIndex", "Analysis"],
-    "ui": ["render_full", "render_compact", "bet_banner"],
+    "ui": ["render_full", "render_compact", "bet_banner", "prediction_row", "insights_list",
+           "team_panel", "methodology"],
+    "board": ["BOARD", "refresh_minutes", "Board"],
+    "charts": ["model_vs_book", "outcome_pie", "score_heatmap", "xg_history", "rating_bars"],
 }
 _missing = []
 for _mod, _names in _NEEDED.items():
