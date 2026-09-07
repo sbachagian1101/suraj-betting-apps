@@ -106,6 +106,30 @@ def prediction_row(A: Analysis):
                    f"{imp['home']:.0%} / {imp['draw']:.0%} / {imp['away']:.0%}.")
 
 
+def bet_banner(A: Analysis):
+    """Big black-on-lime call when the model's edge over the book sits in the
+    bet band; a quiet one-liner otherwise."""
+    sig = M.bet_signal(A.pred, A.odds)
+    if sig is None:
+        st.caption("No odds for this match yet, so no bet signal.")
+        return
+    name = {"home": A.prof_h.name, "draw": "the draw", "away": A.prof_a.name}[sig["side"]]
+    detail = (f"{name}: model {sig['model']:.0%} v book {sig['book']:.0%} "
+              f"(gap {sig['gap']:+.1%}, odds {sig['odds']:.2f})")
+    if sig["bet"]:
+        st.markdown(
+            f'<div style="background:#c6ff00;color:#000;font-weight:900;font-size:2.4rem;'
+            f'line-height:1.15;padding:0.7rem 1.2rem;border-radius:0.6rem;text-align:center;'
+            f'letter-spacing:0.04em;margin:0.4rem 0 0.2rem 0">{sig["label"]}</div>'
+            f'<div style="text-align:center;color:#000;font-size:1.05rem;font-weight:600;'
+            f'margin-bottom:0.6rem">{detail}</div>',
+            unsafe_allow_html=True)
+    else:
+        why = ("above" if sig["gap"] > M.BET_MAX_EDGE else "below")
+        st.caption(f"**NO BET** · biggest gap is {detail}, {why} the "
+                   f"{M.BET_MIN_EDGE:.1%} to {M.BET_MAX_EDGE:.1%} band.")
+
+
 def insights_list(A: Analysis):
     for line in M.insights(A.prof_h, A.prof_a, A.pred, A.la_h, A.la_a, A.odds):
         st.markdown(f"- {line}")
@@ -168,6 +192,7 @@ def render_full(A: Analysis):
     st.title(A.title)
     st.markdown(fixture_line(A))
     prediction_row(A)
+    bet_banner(A)
     st.subheader("Insights")
     insights_list(A)
     left, right = st.columns(2)
@@ -185,6 +210,7 @@ def render_compact(A: Analysis):
     """Inside an expander (no nested expanders allowed): tabs instead."""
     st.markdown(fixture_line(A))
     prediction_row(A)
+    bet_banner(A)
     t1, t2, t3, t4 = st.tabs(["Insights", "Teams & line-ups", "Scorelines", "Method"])
     with t1:
         insights_list(A)

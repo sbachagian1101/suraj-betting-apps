@@ -261,6 +261,27 @@ def test_implied_removes_overround():
     assert M.implied({"home": 3.6, "draw": None, "away": 1.85}) is None
 
 
+def test_bet_signal_band():
+    a = M.profile("A", _records("a", [1.5] * 3, [1.2] * 3, [{"p": 6.8}] * 3))
+    b = M.profile("B", _records("b", [1.5] * 3, [1.2] * 3, [{"p": 6.8}] * 3))
+    pred = M.predict(a, b)                              # roughly 44 / 26 / 30
+    assert M.bet_signal(pred, None) is None
+    imp_h = pred.p_home - 0.10                          # book 10 points below the model on home
+    rest = 1 - imp_h
+    odds = {"home": 1 / imp_h, "draw": 1 / (rest / 2), "away": 1 / (rest / 2)}
+    sig = M.bet_signal(pred, odds)
+    assert sig["side"] == "home" and sig["bet"] and sig["label"] == "BET HOME TEAM"
+    assert M.BET_MIN_EDGE <= sig["gap"] <= M.BET_MAX_EDGE
+    # a 30-point gap is outside the band -> NO BET even though it is the biggest gap
+    imp_a = max(0.02, pred.p_away - 0.30)
+    odds = {"home": 1 / ((1 - imp_a) * 0.6), "draw": 1 / ((1 - imp_a) * 0.4), "away": 1 / imp_a}
+    sig = M.bet_signal(pred, odds)
+    assert sig["side"] == "away" and not sig["bet"] and sig["label"] == "NO BET"
+    # book agrees with the model -> gaps near zero -> NO BET
+    fair = {"home": 1 / pred.p_home, "draw": 1 / pred.p_draw, "away": 1 / pred.p_away}
+    assert not M.bet_signal(pred, fair)["bet"]
+
+
 def test_insights_mention_form_and_book():
     a = M.profile("Alpha", _records("a", [2.5] * 3, [0.8] * 3, [{"p": 7.0}] * 3))
     b = M.profile("Beta", _records("b", [0.9] * 3, [1.9] * 3, [{"p": 6.2}] * 3))

@@ -43,6 +43,14 @@ Soccerway and Flashscore share team ids, so a Flashscore team link
   predicted pre-match and shown against the actual score. Both teams are fetched in
   parallel and team data is cached for ten minutes, so re-runs are fast.
 
+## Bet signal
+
+Under the prediction row a black-on-lime banner says **BET HOME TEAM**, **BET DRAW** or
+**BET AWAY TEAM** when the model's probability for that side exceeds the book's implied
+probability (margin removed) by between 5.0 and 20.0 points. Gaps above 20 points are treated
+as the model being wrong rather than the book, and show **NO BET** with the numbers. The
+whole-day table carries the same signal in its `Bet` column.
+
 ## Desktop app (Windows)
 
 The same code ships as a desktop app in `D:\01_PREDICTION MODELS\SoccerwayPredictor`:

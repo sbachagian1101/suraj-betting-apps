@@ -268,6 +268,28 @@ def implied(odds: dict) -> Optional[dict]:
 
 
 # --------------------------------------------------------------------------- #
+# Bet signal
+# --------------------------------------------------------------------------- #
+BET_MIN_EDGE = 0.05        # model minus book, in probability points
+BET_MAX_EDGE = 0.20        # above this the model is more likely wrong than the book
+BET_LABELS = {"home": "BET HOME TEAM", "draw": "BET DRAW", "away": "BET AWAY TEAM"}
+
+
+def bet_signal(pred: "Prediction", odds: Optional[dict]) -> Optional[dict]:
+    """The side with the biggest model-over-book gap, flagged as a bet when the
+    gap sits inside [BET_MIN_EDGE, BET_MAX_EDGE]. None without odds."""
+    imp = implied(odds) if odds else None
+    if not imp:
+        return None
+    gaps = {"home": pred.p_home - imp["home"], "draw": pred.p_draw - imp["draw"],
+            "away": pred.p_away - imp["away"]}
+    side, gap = max(gaps.items(), key=lambda kv: kv[1])
+    bet = BET_MIN_EDGE <= gap <= BET_MAX_EDGE
+    return dict(side=side, gap=gap, bet=bet, label=BET_LABELS[side] if bet else "NO BET",
+                model=getattr(pred, "p_" + side), book=imp[side], odds=odds.get(side))
+
+
+# --------------------------------------------------------------------------- #
 # Insights
 # --------------------------------------------------------------------------- #
 def insights(home: TeamProfile, away: TeamProfile, pred: Prediction,

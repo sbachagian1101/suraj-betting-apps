@@ -194,14 +194,10 @@ with tab_all:
                 rows.append(base | {"Error": str(A)[:80]})
                 continue
             p, o = A.pred, A.odds
-            imp = M.implied(o) if o else None
-            edge = ""
-            if imp:
-                gaps = {"H": p.p_home - imp["home"], "D": p.p_draw - imp["draw"],
-                        "A": p.p_away - imp["away"]}
-                k = max(gaps, key=gaps.get)
-                edge = f"{k} {gaps[k]:+.0%}"
+            sig = M.bet_signal(p, o)
+            edge = f"{sig['side'][0].upper()} {sig['gap']:+.0%}" if sig else ""
             rows.append(base | {
+                "Bet": sig["label"] if sig else "",
                 "Home %": round(p.p_home * 100), "Draw %": round(p.p_draw * 100),
                 "Away %": round(p.p_away * 100),
                 "Exp score": f"{p.exp_home:.2f}-{p.exp_away:.2f}",
@@ -233,5 +229,8 @@ with tab_all:
             label += f" · {p.p_home:.0%} / {p.p_draw:.0%} / {p.p_away:.0%} · {p.top_scores[0][0]}"
             if m.stage in ("2", "3") and m.home_score is not None:
                 label += f" · actual {m.home_score}-{m.away_score}"
+            sig = M.bet_signal(p, A.odds)
+            if sig and sig["bet"]:
+                label += f" · 🟢 {sig['label']}"
             with st.expander(label):
                 ui.render_compact(A)

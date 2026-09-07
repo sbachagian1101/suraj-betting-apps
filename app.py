@@ -21,10 +21,11 @@ _NEEDED = {
     "model": ["profile", "assess_lineup", "predict", "implied", "insights",
               "recency_weights", "LineupAssessment", "TeamProfile",
               "XG_WEIGHT", "LEAGUE_AVG", "PRIOR_GAMES", "HOME_ADV", "AWAY_ADV",
-              "RATING_K", "RATING_K_OPP", "MAX_GOALS", "DECAY", "N_RATES", "N_LINEUP"],
+              "RATING_K", "RATING_K_OPP", "MAX_GOALS", "DECAY", "N_RATES", "N_LINEUP",
+              "bet_signal", "BET_MIN_EDGE", "BET_MAX_EDGE"],
     "pipeline": ["analyse_pair", "analyse_fixture", "daily_cached", "latest_match",
                  "on_day", "DayIndex", "Analysis"],
-    "ui": ["render_full", "render_compact"],
+    "ui": ["render_full", "render_compact", "bet_banner"],
 }
 _missing = []
 for _mod, _names in _NEEDED.items():
