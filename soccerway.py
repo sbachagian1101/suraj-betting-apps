@@ -50,6 +50,26 @@ class SoccerwayError(RuntimeError):
     pass
 
 
+# Mauritius is UTC+4 all year; zoneinfo is used when tzdata is available so a
+# future rule change is picked up, with a fixed +4 fallback.
+try:
+    from zoneinfo import ZoneInfo
+    MU_TZ = ZoneInfo("Indian/Mauritius")
+except Exception:                                   # noqa: BLE001
+    from datetime import timedelta as _td
+    MU_TZ = timezone(_td(hours=4))
+
+
+def to_mu(dt: datetime) -> datetime:
+    """Convert an aware datetime to Mauritius time."""
+    return dt.astimezone(MU_TZ)
+
+
+def fmt_mu(dt: datetime, with_date: bool = False) -> str:
+    local = to_mu(dt)
+    return local.strftime("%a %d %b %H:%M" if with_date else "%H:%M")
+
+
 # --------------------------------------------------------------------------- #
 # Small data classes
 # --------------------------------------------------------------------------- #

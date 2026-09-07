@@ -44,7 +44,7 @@ tab_pick, tab_all, tab_board = st.tabs(["Pick a match", "Whole day", "Live board
 
 
 def match_label(m: SW.Match) -> str:
-    s = f"{m.kickoff.strftime('%H:%M')} UTC · {m.home_name} v {m.away_name}"
+    s = f"{SW.fmt_mu(m.kickoff)} MU ({m.kickoff.strftime('%H:%M')} UTC) · {m.home_name} v {m.away_name}"
     if m.stage in ("2", "3") and m.home_score is not None:
         s += f" · {m.home_score}-{m.away_score} ({m.status})"
     elif m.status != "Scheduled":
@@ -186,6 +186,7 @@ with tab_all:
         for m, A in results:
             base = {
                 "Kick-off (UTC)": m.kickoff.strftime("%H:%M"),
+                "Kick-off (MU)": SW.fmt_mu(m.kickoff),
                 "League": m.competition,
                 "Home": m.home_name, "Away": m.away_name,
                 "Status": m.status,
@@ -262,6 +263,7 @@ def board_frame(rows, now: datetime) -> pd.DataFrame:
         base = {
             "id": m.id,
             "Start (UTC)": m.kickoff.strftime("%H:%M"),
+            "Start (MU)": SW.fmt_mu(m.kickoff),
             "Starts in": starts_in(m, now),
             "Country": country, "League": league,
             "Match": f"{m.home_name} v {m.away_name}",

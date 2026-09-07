@@ -39,6 +39,16 @@ def test_parse_team_url_rejects_junk():
         SW.parse_team_url("https://us.soccerway.com/game/groningen-MBUGcjb9/psv-M9UEHJWi/")
 
 
+def test_mauritius_time_is_utc_plus_four():
+    kick = datetime(2026, 9, 7, 17, 0, tzinfo=timezone.utc)
+    assert SW.to_mu(kick).strftime("%H:%M") == "21:00"
+    assert SW.fmt_mu(kick) == "21:00"
+    assert SW.fmt_mu(kick, with_date=True) == "Mon 07 Sep 21:00"
+    # a late UTC kick-off rolls into the next Mauritian day
+    late = datetime(2026, 9, 7, 21, 30, tzinfo=timezone.utc)
+    assert SW.fmt_mu(late, with_date=True) == "Tue 08 Sep 01:30"
+
+
 def test_clean_name_strips_country_tag():
     assert SW.clean_name("Twente (Ned)") == "Twente"
     assert SW.clean_name("Qarabag (Aze)") == "Qarabag"

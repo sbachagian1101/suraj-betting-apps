@@ -80,7 +80,7 @@ def fixture_line(A: Analysis) -> str:
     f = A.fixture
     if not f:
         return "No upcoming fixture listed between these teams."
-    when = f.kickoff.strftime("%a %d %b %Y, %H:%M UTC")
+    when = f"{SW.fmt_mu(f.kickoff, with_date=True)} Mauritius ({f.kickoff.strftime('%H:%M')} UTC)"
     score = (f" · {f.home_score}-{f.away_score}"
              if f.stage in ("2", "3") and f.home_score is not None else "")
     return f"{f.competition} · {when} · **{f.status}**{score} · [match page]({f.url})"

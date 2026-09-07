@@ -16,7 +16,7 @@ st.set_page_config(page_title="Soccerway Predictor", page_icon="⚽", layout="wi
 _NEEDED = {
     "soccerway": ["parse_team_url", "team_results", "team_fixtures", "match_stats",
                   "match_lineups", "match_odds", "build_record", "clean_name",
-                  "daily_matches", "select_leagues", "history_before",
+                  "daily_matches", "select_leagues", "history_before", "to_mu", "fmt_mu",
                   "SoccerwayError", "MatchRecord"],
     "model": ["profile", "assess_lineup", "predict", "implied", "insights",
               "recency_weights", "LineupAssessment", "TeamProfile",
