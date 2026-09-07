@@ -73,6 +73,67 @@ def test_clean_markdown_links_bullets_and_pipe_tables():
     assert "Tab\tHorse" in out and "1\tCALAS" in out and "---" not in out
 
 
+def test_speed_map_paste_parses_pace_values():
+    raw = read("rs_canberra_r5_2026-09-04_speedmap.txt")
+    assert rs_paste.has_speed_map(raw)
+    rows = rs_paste.parse_speed_map(raw)
+    assert len(rows) == 15
+    r1 = rows[1]
+    assert r1.name == "Deekaygeebee" and r1.weight == 63.0 and r1.jockey == "Dale Cole"
+    assert r1.jr == 4.1 and r1.bp == 5 and r1.aes == 17.0 and r1.afs == 17.6
+    assert rows[3].bp == 13 and rows[20].aes == 16.0 and rows[20].afs == 18.0
+    idn = rs_paste.identity(raw)
+    assert idn.venue == "Canberra" and idn.race_no == 5 and idn.dist_m == 1400
+
+
+def test_speed_map_absent_from_full_fields():
+    assert not rs_paste.has_speed_map(read("rs_deauville_r1_2026-09-01.txt"))
+    assert rs_paste.parse_speed_map(read("rs_grafton_r2_2026-09-07_header.txt")) == {}
+
+
+def test_apply_speed_map_prefers_its_barrier_and_feeds_the_model():
+    rows = rs_paste.parse_speed_map(read("rs_canberra_r5_2026-09-04_speedmap.txt"))
+    card = common.RaceCard(country="AUS", dist_m=1400, surface="TURF", going="SOFT", currency="AUD")
+    for tab, r in rows.items():
+        card.entries.append(common.Entry(number=tab, name=r.name.upper(), barrier=99, odds=8.0))
+    n = rs_paste.apply_speed_map(card, rows)
+    assert n == 15 and card.entries[0].barrier == 5 and card.entries[0].extras["aes"] == 17.0
+    rated, _ = M.rate(card, M.Params())
+    by = {r.number: r for r in rated}
+    # AES 17.0 (top of field) -> leader; AES 15.8 (bottom) -> backmarker
+    assert by[1].speed_score == pytest.approx(1.0) and by[6].speed_score == pytest.approx(0.0)
+    # AFS 18.0 is the strongest finisher, 16.0 the weakest
+    assert by[9].terms["late speed"] > 0 > by[3].terms["late speed"]
+    # JR 4.6 best jockey rating, 1.6 worst (no jockey record supplied)
+    assert by[9].terms["jockey"] > by[19].terms["jockey"]
+
+
+def test_pipeline_uses_speed_map_paste(monkeypatch):
+    ev = json.load(io.open(os.path.join(FX, "lb_grafton_r2.json"), encoding="utf-8"))
+
+    def fake_lb(day, venue, race_no, country="AUS"):
+        c = ladbrokes.card_from_event(ev["data"])
+        c.race_date = day
+        return c
+
+    def fail(*a, **k):
+        raise common.SourceError("offline")
+    monkeypatch.setattr(pipeline.ladbrokes, "fetch", fake_lb)
+    monkeypatch.setattr(pipeline.betfair, "fetch", fail)
+    # a Speed Map for a different race must be refused, not silently applied
+    A = pipeline.analyse(read("rs_grafton_r2_2026-09-07_header.txt"),
+                         speed_raw=read("rs_canberra_r5_2026-09-04_speedmap.txt"))
+    assert any("Speed Map paste is for Canberra race 5" in w for w in A.card.warnings)
+    assert all(e.extras.get("aes") is None for e in A.card.entries)
+    # the same table relabelled as Grafton R2 attaches to the runners it can match by tab
+    sm = read("rs_canberra_r5_2026-09-04_speedmap.txt").replace("canberra", "grafton").replace(
+        "Canberra", "Grafton").replace("Race 5", "Race 2").replace("2026-09-04", "2026-09-07")
+    B = pipeline.analyse(read("rs_grafton_r2_2026-09-07_header.txt"), speed_raw=sm)
+    matched = [e for e in B.card.entries if e.extras.get("aes") is not None]
+    assert matched and "Racing & Sports Speed Map" in B.card.sources
+    assert any("Speed Map paste" in n for n in B.notes)
+
+
 # --------------------------------------------------------------------------- #
 # sources on snapshots
 # --------------------------------------------------------------------------- #

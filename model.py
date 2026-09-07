@@ -64,6 +64,8 @@ class Params:
     k_speed: float = 0.50
     k_pace: float = 0.60
     k_sectional: float = 0.90            # lengths per second faster last-400m than field median
+    k_late: float = 0.45                 # lengths per SD of R&S AFS (finishing speed) vs field
+    k_jr: float = 0.30                   # lengths per point of R&S jockey rating vs field mean
     k_move: float = 0.80                 # lengths per log(open/current)
     k_tip: float = 0.35
     k_class_adj: float = 1.50
@@ -187,8 +189,12 @@ SPEED_SCORE = {"leader": 1.0, "lead": 1.0, "on pace": 0.7, "on-pace": 0.7, "hand
                "backmarker": 0.05, "rear": 0.05}
 
 
-def speed_score(e: Entry) -> Optional[float]:
-    """0 = backmarker .. 1 = leader, from settling lengths or the speed-map label."""
+def speed_score(e: Entry, aes_range: Optional[tuple[float, float]] = None) -> Optional[float]:
+    """0 = backmarker .. 1 = leader, from the R&S AES pace value (ranked within the
+    field), else settling lengths, else the speed-map label."""
+    aes = e.extras.get("aes")
+    if aes is not None and aes_range and aes_range[1] > aes_range[0]:
+        return max(0.0, min(1.0, (aes - aes_range[0]) / (aes_range[1] - aes_range[0])))
     if e.settling is not None:
         return max(0.0, min(1.0, 1.0 - e.settling / 10.0))
     lab = (e.speed_label or "").strip().lower()
@@ -278,7 +284,14 @@ def rate(card: RaceCard, p: Params | None = None) -> tuple[list[Rated], list[str
     max_bar = max(barriers) if barriers else 0
     secs = sorted(e.sectional_600 for e in field_ if e.sectional_600)
     med_sec = secs[len(secs) // 2] if secs else None
-    speeds = {e.number: speed_score(e) for e in field_}
+    aes_vals = [e.extras["aes"] for e in field_ if e.extras.get("aes") is not None]
+    aes_range = (min(aes_vals), max(aes_vals)) if len(aes_vals) >= 2 else None
+    speeds = {e.number: speed_score(e, aes_range) for e in field_}
+    afs_vals = [e.extras["afs"] for e in field_ if e.extras.get("afs") is not None]
+    afs_mean = sum(afs_vals) / len(afs_vals) if afs_vals else None
+    afs_sd = (sum((v - afs_mean) ** 2 for v in afs_vals) / len(afs_vals)) ** 0.5 if afs_vals else 0.0
+    jr_vals = [e.extras["jr"] for e in field_ if e.extras.get("jr") is not None]
+    jr_mean = sum(jr_vals) / len(jr_vals) if jr_vals else None
     known_speed = [v for v in speeds.values() if v is not None]
     n_leaders = sum(1 for v in known_speed if v >= 0.7)
     pace = "even"
@@ -355,6 +368,12 @@ def rate(card: RaceCard, p: Params | None = None) -> tuple[list[Rated], list[str
             t["speed"] = 0.0
         t["sectional"] = (p.k_sectional * (med_sec - e.sectional_600)
                           if e.sectional_600 and med_sec else 0.0)
+        afs = e.extras.get("afs")
+        t["late speed"] = (p.k_late * (afs - afs_mean) / afs_sd
+                           if afs is not None and afs_mean is not None and afs_sd > 1e-6 else 0.0)
+        jr = e.extras.get("jr")
+        if jr is not None and jr_mean is not None and not e.jockey_stats:
+            t["jockey"] = p.k_jr * (jr - jr_mean)      # R&S jockey rating stands in for a record
         mv = e.move_pct
         t["market move"] = -p.k_move * math.log(1.0 + mv) if mv is not None and mv > -0.95 else 0.0
         t["tips"] = p.k_tip * (3 - e.tip_rank) / 2.0 if e.tip_rank and e.tip_rank <= 3 else 0.0
@@ -559,6 +578,7 @@ def sensitivity(card: RaceCard, base: Params, draws: int = 200) -> dict[str, flo
                     k_jockey=rng.uniform(2.0, 6.0), k_trainer=rng.uniform(1.5, 5.0),
                     k_barrier=rng.uniform(0.3, 1.5), k_weight=rng.uniform(0.15, 0.6),
                     k_speed=rng.uniform(0.2, 0.9), k_pace=rng.uniform(0.2, 1.0),
+                    k_late=rng.uniform(0.15, 0.8), k_jr=rng.uniform(0.1, 0.5),
                     k_move=rng.uniform(0.2, 1.4), market_weight=rng.uniform(0.2, 0.55),
                     k_class_adj=base.k_class_adj * rng.uniform(0.3, 1.6))
         rows, _ = rate(card, q)

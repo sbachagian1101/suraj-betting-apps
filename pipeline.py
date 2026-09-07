@@ -126,9 +126,29 @@ def gather(idn: rs_paste.Identity, paste_card: RaceCard, timeout: float = 75.0,
 
 def analyse(raw: str, country: str = "", venue: str = "", race_no: Optional[int] = None,
             race_day: Optional[date] = None, params: Optional[M.Params] = None,
-            progress: Optional[Callable[[str], None]] = None) -> Analysis:
+            progress: Optional[Callable[[str], None]] = None, speed_raw: str = "") -> Analysis:
     t0 = time.time()
     idn, paste_card = rs_paste.parse_paste(raw or "")
+    # The Speed Map page may be pasted in its own box or appended to the main paste.
+    speed_rows: dict[int, rs_paste.SpeedRow] = {}
+    speed_note = ""
+    for text in (speed_raw or "", raw or ""):
+        if text and rs_paste.has_speed_map(text):
+            speed_rows = rs_paste.parse_speed_map(text)
+            if speed_rows:
+                sid = rs_paste.identity(text)
+                if sid.venue and idn.venue and (sid.venue != idn.venue or (sid.race_no and idn.race_no
+                                                                          and sid.race_no != idn.race_no)):
+                    speed_note = (f"The Speed Map paste is for {sid.venue} race {sid.race_no}, not "
+                                  f"{idn.venue} race {idn.race_no} - ignored.")
+                    speed_rows = {}
+                elif not idn.complete:
+                    # a speed-map-only paste still identifies the race
+                    idn.country = idn.country or sid.country
+                    idn.venue = idn.venue or sid.venue
+                    idn.race_no = idn.race_no or sid.race_no
+                    idn.race_date = idn.race_date or sid.race_date
+                break
     # typed fields fill whatever the paste did not carry
     idn.country = idn.country or country
     idn.venue = idn.venue or venue
@@ -140,6 +160,14 @@ def analyse(raw: str, country: str = "", venue: str = "", race_no: Optional[int]
         raise ValueError("Cannot identify the race: missing " + ", ".join(missing))
     paste_card.country = idn.country
     card, status = gather(idn, paste_card, progress=progress)
+    if speed_rows:
+        n = rs_paste.apply_speed_map(card, speed_rows)
+        card.notes.append(f"Speed Map paste: AES/AFS pace values attached to {n} of "
+                          f"{len(speed_rows)} runners; barriers taken from it.")
+        if progress:
+            progress(f"Speed Map paste: {n} runners matched")
+    if speed_note:
+        card.warnings.append(speed_note)
     p = params or M.defaults_for(idn.country)
     rows, notes = M.rate(card, p)
     sim = M.simulate(rows, p) if rows else None

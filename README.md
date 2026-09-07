@@ -20,6 +20,12 @@ When the paste is a **Full Fields** page the vendored `rs_parser` also reads eac
 last-10 run table, which becomes the richest Australian form source. A header-only paste is
 normal: the runners then come from the feeds.
 
+The optional second box takes the R&S **Speed Map** page. Its Pace Values table gives each
+runner's AES (average early speed), AFS (average finishing speed), JR (jockey rating) and the
+barrier after scratchings. AES ranked within the field drives the early-speed / pace-shape
+term, AFS adds a late-speed term, JR stands in for a jockey record when no feed supplies one,
+and the Speed Map barrier overrides the feed's. A Speed Map for a different race is refused.
+
 ## Feeds (all free, no login, verified 7 Sep 2026)
 
 | Country | Source | What it gives |

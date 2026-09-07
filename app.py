@@ -70,6 +70,11 @@ with st.sidebar:
         st.session_state["raw"] = io.open(SAMPLE, encoding="utf-8").read()
     raw = st.text_area("Racing & Sports paste", key="raw", height=220,
                        placeholder="* [Race 2](https://www.racingandsports.com.au/form-guide/thoroughbred/australia/grafton/2026-09-07/R2)\n...")
+    speed_raw = st.text_area("Speed Map paste (optional)", key="speed_raw", height=120,
+                             placeholder="Copy the R&S Speed Map tab (Pace Values table: Tab, Horse, WT, Jockey, JR, BP, AES, AFS)",
+                             help="Adds each runner's average early speed (AES), finishing speed (AFS), "
+                                  "jockey rating (JR) and the barrier after scratchings. You can also "
+                                  "append the Speed Map page under the main paste.")
     go = st.button("🔍 Search & predict", type="primary", width="stretch")
     st.divider()
     st.header("Model settings")
@@ -98,7 +103,7 @@ if go:
         try:
             A = pipeline.analyse(raw or "", country=country_code, venue=venue.strip(),
                                  race_no=int(race_no), race_day=race_day, params=params,
-                                 progress=progress)
+                                 progress=progress, speed_raw=speed_raw or "")
             st.session_state["analysis"] = A
             box.update(label=f"Done in {A.seconds:.0f}s", state="complete", expanded=False)
         except ValueError as exc:
@@ -245,15 +250,26 @@ with t_speed:
     st.plotly_chart(charts.speed_map(rows, card.dist_m), width="stretch")
     sm = pd.DataFrame([{"No": r.number, "Horse": r.name, "Barrier": r.entry.barrier,
                         "Run style": r.entry.speed_label or "—",
+                        "AES": r.entry.extras.get("aes"), "AFS": r.entry.extras.get("afs"),
+                        "JR": r.entry.extras.get("jr"),
                         "Settling (L off lead)": r.entry.settling,
                         "Early speed 0-10": (r.speed_score * 10) if r.speed_score is not None else None,
                         "Last-400m (s)": r.entry.sectional_600,
                         "Speed term (L)": r.terms.get("speed", 0.0),
+                        "Late speed term (L)": r.terms.get("late speed", 0.0),
                         "Sectional term (L)": r.terms.get("sectional", 0.0)} for r in rows])
-    st.dataframe(sm, hide_index=True, width="stretch")
-    if not any(r.speed_score is not None for r in rows):
-        st.info("No run-style data for this race from the feeds. Paste the R&S Speed Map page "
-                "text below the Full Fields page to add it (coming next).")
+    st.dataframe(sm, hide_index=True, width="stretch",
+                 column_config={"AES": st.column_config.NumberColumn(format="%.1f"),
+                                "AFS": st.column_config.NumberColumn(format="%.1f"),
+                                "JR": st.column_config.NumberColumn(format="%.1f"),
+                                "Early speed 0-10": st.column_config.NumberColumn(format="%.1f")})
+    if any(r.entry.extras.get("aes") is not None for r in rows):
+        st.caption("AES / AFS are Racing & Sports pace values from your Speed Map paste: average early "
+                   "speed and average finishing speed (higher = faster). Early speed here is AES ranked "
+                   "within the field; the late-speed term is AFS versus the field in standard deviations.")
+    elif not any(r.speed_score is not None for r in rows):
+        st.info("No run-style data for this race from the feeds. Paste the R&S Speed Map page in the "
+                "sidebar's second box to add AES / AFS pace values.")
 
 with t_form:
     st.plotly_chart(charts.form_heatmap(rows), width="stretch")
@@ -375,8 +391,11 @@ market move + tips.
 * **Jockey / trainer** strike rates are shrunk toward 10% with a 40-start prior; each log-unit
   above that is worth {p.k_jockey} / {p.k_trainer} L.
 * **Barrier** costs up to {p.k_barrier} L for the widest gate at 1200 m, scaled by 1200/distance.
-  **Speed**: run style vs field, with a hot pace (3+ leaders) penalising leaders and a slow pace
-  rewarding a lone leader. **Sectional** (HK): {p.k_sectional} L per second of last-400 m vs the field median.
+  **Speed**: run style vs field (R&S AES ranked within the field when a Speed Map is pasted, else the
+  Ladbrokes settling position or label), with a hot pace (3+ leaders) penalising leaders and a slow pace
+  rewarding a lone leader. **Late speed**: {p.k_late} L per SD of R&S AFS vs the field. **JR**: when no
+  jockey record exists, {p.k_jr} L per point of R&S jockey rating vs the field mean.
+  **Sectional** (HK): {p.k_sectional} L per second of last-400 m vs the field median.
 * **Market**: prices are de-vigged by the power method (longshots shrunk more). Where a runner
   has little evidence its rating is shrunk toward the market's implied rating, never toward the
   field mean. Final = exp({p.market_weight:.2f}·log(form) + {1 - p.market_weight:.2f}·log(market)).

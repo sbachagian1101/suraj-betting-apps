@@ -239,6 +239,96 @@ def to_card(race: rs_parser.Race, idn: Identity) -> RaceCard:
     return card
 
 
+# --- Speed Map page ------------------------------------------------------------
+
+_SM_ROW = re.compile(r"(?m)^\s*(\d{1,2})\t+([A-Z][A-Z0-9' .\-()]+?)\s*$")
+_SM_ROW_LOOSE = re.compile(r"(?m)^\s*(\d{1,2})\s{2,}([A-Z][A-Z0-9' .\-()]+?)\s*$")
+_NUM = re.compile(r"^\$?(\d+(?:\.\d+)?)$")
+
+
+@dataclass
+class SpeedRow:
+    tab: int
+    name: str = ""
+    weight: Optional[float] = None
+    jockey: str = ""
+    jr: Optional[float] = None       # R&S jockey rating
+    bp: Optional[int] = None         # barrier after scratchings
+    aes: Optional[float] = None      # average early speed (higher = faster early)
+    afs: Optional[float] = None      # average finishing speed (higher = stronger late)
+
+
+def has_speed_map(raw: str) -> bool:
+    t = raw or ""
+    return "Pace Values" in t or ("AES" in t and "AFS" in t)
+
+
+def parse_speed_map(raw: str) -> dict[int, SpeedRow]:
+    """Read the R&S Speed Map "Pace Values" table.
+
+    Each runner spans three lines: ``1\\t\\tNAME``, the breeding line, then
+    ``63.0\\tJOCKEY (a2kg)\\t4.1\\t5\\t17.0\\t17.6`` = WT, jockey, JR, BP, AES, AFS.
+    Only the trailing numbers are trusted, so an empty jockey cell cannot shift
+    the pairing.  Returns {} when the paste has no Pace Values table.
+    """
+    t = clean_markdown(raw or "")
+    if "AES" not in t:
+        return {}
+    t = t[t.index("AES") - 200 if t.index("AES") > 200 else 0:]
+    rows = list(_SM_ROW.finditer(t)) or list(_SM_ROW_LOOSE.finditer(t))
+    out: dict[int, SpeedRow] = {}
+    for idx, m in enumerate(rows):
+        tab = int(m.group(1))
+        end = rows[idx + 1].start() if idx + 1 < len(rows) else len(t)
+        seg = t[m.end():end]
+        for ln in seg.splitlines():
+            cells = [c.strip() for c in re.split(r"\t|\s{2,}", ln)]
+            nums = [c for c in cells if _NUM.match(c)]
+            if len(nums) >= 4:
+                aes, afs = float(nums[-2]), float(nums[-1])
+                if 10.0 <= aes <= 22.0 and 10.0 <= afs <= 22.0:
+                    row = SpeedRow(tab=tab, name=m.group(2).strip().title(), aes=aes, afs=afs)
+                    try:
+                        row.bp = int(float(nums[-3]))
+                        row.jr = float(nums[-4])
+                    except ValueError:
+                        pass
+                    if len(nums) >= 5:
+                        try:
+                            row.weight = float(nums[0])
+                        except ValueError:
+                            pass
+                    words = [c for c in cells if c and not _NUM.match(c)]
+                    if words:
+                        row.jockey = re.sub(r"\s*\([^)]*\)\s*$", "", words[-1]).strip().title()
+                    out[tab] = row
+                    break
+    return out
+
+
+def apply_speed_map(card: RaceCard, rows: dict[int, SpeedRow]) -> int:
+    """Attach AES / AFS / JR to the card's entries by tab number; prefer the Speed
+    Map's barrier (re-numbered after scratchings).  Returns how many matched."""
+    n = 0
+    for tab, row in rows.items():
+        e = card.find(tab, row.name)
+        if e is None:
+            continue
+        e.extras["aes"], e.extras["afs"], e.extras["jr"] = row.aes, row.afs, row.jr
+        if row.bp:
+            e.barrier = row.bp
+        if row.weight and not e.weight:
+            e.weight = row.weight
+        if row.jockey and not e.jockey:
+            e.jockey = row.jockey
+        if "Racing & Sports Speed Map" not in e.sources:
+            e.sources.append("Racing & Sports Speed Map")
+        n += 1
+    if n and "Racing & Sports Speed Map" not in card.sources:
+        card.sources.append("Racing & Sports Speed Map")
+    return n
+
+
 def parse_paste(raw: str) -> tuple[Identity, RaceCard]:
     idn = identity(raw)
     race = rs_parser.parse(clean_markdown(raw))
