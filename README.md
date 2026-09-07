@@ -56,10 +56,11 @@ Soccerway and Flashscore share team ids, so a Flashscore team link
 ## Bet signal
 
 Under the prediction row a black-on-lime banner says **BET HOME TEAM**, **BET DRAW** or
-**BET AWAY TEAM** when the model's probability for that side exceeds the book's implied
-probability (margin removed) by between 5.0 and 20.0 points. Gaps above 20 points are treated
-as the model being wrong rather than the book, and show **NO BET** with the numbers. The
-whole-day table carries the same signal in its `Bet` column.
+**BET AWAY TEAM** when, for the side with the biggest model-over-book gap, both hold:
+the model puts that side **above 50%**, and the gap between the model and the book's implied
+probability (margin removed) is **between 5.0 and 20.0 points**. Gaps above 20 points are
+treated as the model being wrong rather than the book. Anything else shows **NO BET** with the
+reasons. The whole-day table and the live board carry the same signal in their selection column.
 
 ## Desktop app (Windows)
 

@@ -270,23 +270,34 @@ def implied(odds: dict) -> Optional[dict]:
 # --------------------------------------------------------------------------- #
 # Bet signal
 # --------------------------------------------------------------------------- #
+BET_MIN_PROB = 0.50        # the model must make that side more likely than not
 BET_MIN_EDGE = 0.05        # model minus book, in probability points
 BET_MAX_EDGE = 0.20        # above this the model is more likely wrong than the book
 BET_LABELS = {"home": "BET HOME TEAM", "draw": "BET DRAW", "away": "BET AWAY TEAM"}
 
 
 def bet_signal(pred: "Prediction", odds: Optional[dict]) -> Optional[dict]:
-    """The side with the biggest model-over-book gap, flagged as a bet when the
-    gap sits inside [BET_MIN_EDGE, BET_MAX_EDGE]. None without odds."""
+    """The side with the biggest model-over-book gap, flagged as a bet only when
+    the model puts that side above BET_MIN_PROB *and* the gap sits inside
+    [BET_MIN_EDGE, BET_MAX_EDGE]. None without odds. ``reasons`` lists what
+    failed when it is not a bet."""
     imp = implied(odds) if odds else None
     if not imp:
         return None
     gaps = {"home": pred.p_home - imp["home"], "draw": pred.p_draw - imp["draw"],
             "away": pred.p_away - imp["away"]}
     side, gap = max(gaps.items(), key=lambda kv: kv[1])
-    bet = BET_MIN_EDGE <= gap <= BET_MAX_EDGE
+    prob = getattr(pred, "p_" + side)
+    reasons = []
+    if prob <= BET_MIN_PROB:
+        reasons.append(f"model {prob:.0%} is not above {BET_MIN_PROB:.0%}")
+    if gap < BET_MIN_EDGE:
+        reasons.append(f"gap {gap:+.1%} is below {BET_MIN_EDGE:.0%}")
+    elif gap > BET_MAX_EDGE:
+        reasons.append(f"gap {gap:+.1%} is above {BET_MAX_EDGE:.0%}")
+    bet = not reasons
     return dict(side=side, gap=gap, bet=bet, label=BET_LABELS[side] if bet else "NO BET",
-                model=getattr(pred, "p_" + side), book=imp[side], odds=odds.get(side))
+                model=prob, book=imp[side], odds=odds.get(side), reasons=reasons)
 
 
 # --------------------------------------------------------------------------- #

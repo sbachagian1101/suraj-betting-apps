@@ -271,25 +271,40 @@ def test_implied_removes_overround():
     assert M.implied({"home": 3.6, "draw": None, "away": 1.85}) is None
 
 
-def test_bet_signal_band():
-    a = M.profile("A", _records("a", [1.5] * 3, [1.2] * 3, [{"p": 6.8}] * 3))
-    b = M.profile("B", _records("b", [1.5] * 3, [1.2] * 3, [{"p": 6.8}] * 3))
-    pred = M.predict(a, b)                              # roughly 44 / 26 / 30
+def _odds_with_gap(pred, side, gap):
+    """Bookmaker odds whose margin-free implied probability on ``side`` is the
+    model's probability minus ``gap``, the rest split evenly."""
+    p = {"home": pred.p_home, "draw": pred.p_draw, "away": pred.p_away}
+    imp = {side: p[side] - gap}
+    others = [k for k in p if k != side]
+    for k in others:
+        imp[k] = (1 - imp[side]) / 2
+    return {k: 1 / v for k, v in imp.items()}
+
+
+def test_bet_signal_needs_majority_and_band():
+    strong = M.profile("A", _records("a", [2.6] * 3, [0.6] * 3, [{"p": 7.2}] * 3))
+    weak = M.profile("B", _records("b", [0.7] * 3, [2.0] * 3, [{"p": 6.3}] * 3))
+    pred = M.predict(strong, weak)
+    assert pred.p_home > M.BET_MIN_PROB                 # home favourite well above 50%
     assert M.bet_signal(pred, None) is None
-    imp_h = pred.p_home - 0.10                          # book 10 points below the model on home
-    rest = 1 - imp_h
-    odds = {"home": 1 / imp_h, "draw": 1 / (rest / 2), "away": 1 / (rest / 2)}
-    sig = M.bet_signal(pred, odds)
+    sig = M.bet_signal(pred, _odds_with_gap(pred, "home", 0.10))
     assert sig["side"] == "home" and sig["bet"] and sig["label"] == "BET HOME TEAM"
-    assert M.BET_MIN_EDGE <= sig["gap"] <= M.BET_MAX_EDGE
-    # a 30-point gap is outside the band -> NO BET even though it is the biggest gap
-    imp_a = max(0.02, pred.p_away - 0.30)
-    odds = {"home": 1 / ((1 - imp_a) * 0.6), "draw": 1 / ((1 - imp_a) * 0.4), "away": 1 / imp_a}
-    sig = M.bet_signal(pred, odds)
+    assert sig["reasons"] == []
+    # gap outside the band -> NO BET even with the majority
+    sig = M.bet_signal(pred, _odds_with_gap(pred, "home", 0.30))
+    assert not sig["bet"] and any("above" in r for r in sig["reasons"])
+    sig = M.bet_signal(pred, _odds_with_gap(pred, "home", 0.02))
+    assert not sig["bet"] and any("below" in r for r in sig["reasons"])
+    # the away side has a gap in band but the model gives it well under 50% -> NO BET
+    sig = M.bet_signal(pred, _odds_with_gap(pred, "away", 0.10))
     assert sig["side"] == "away" and not sig["bet"] and sig["label"] == "NO BET"
-    # book agrees with the model -> gaps near zero -> NO BET
-    fair = {"home": 1 / pred.p_home, "draw": 1 / pred.p_draw, "away": 1 / pred.p_away}
-    assert not M.bet_signal(pred, fair)["bet"]
+    assert any("not above 50%" in r for r in sig["reasons"])
+    # an even match: nobody above 50%, so never a bet whatever the gap
+    even = M.predict(M.profile("A", _records("a", [1.5] * 3, [1.2] * 3, [{"p": 6.8}] * 3)),
+                     M.profile("B", _records("b", [1.5] * 3, [1.2] * 3, [{"p": 6.8}] * 3)))
+    assert max(even.p_home, even.p_draw, even.p_away) < M.BET_MIN_PROB
+    assert not M.bet_signal(even, _odds_with_gap(even, "home", 0.10))["bet"]
 
 
 def test_insights_mention_form_and_book():
