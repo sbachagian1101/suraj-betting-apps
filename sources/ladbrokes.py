@@ -77,8 +77,9 @@ def card_from_event(ev: dict, meeting: dict | None = None) -> RaceCard:
     going = _re.sub(r"([A-Za-z])(\d)", r"\1 \2", going)          # "Good4" -> "Good 4"
     card = RaceCard(venue=race.get("meeting_name", ""), race_no=race.get("race_number"),
                     name=race.get("description", ""), dist_m=race.get("distance"),
-                    going=going, weather=race.get("weather", ""),
-                    rail=race.get("rail_position", ""), sources=[NAME])
+                    going=going, weather=str(race.get("weather") or ""),
+                    rail=(race.get("rail_position") if isinstance(race.get("rail_position"), str) else ""),
+                    sources=[NAME])
     st = race.get("advertised_start")
     if st:
         card.extras["start_utc"] = datetime.fromtimestamp(int(st), tz=timezone.utc)
