@@ -335,7 +335,7 @@ def test_league_day_page_runs_for_premier_league():
     at.switch_page("views/league_day.py")
     at.run()
     at.text_area[0].set_value("ENGLAND: Premier League").run()
-    at.button[0].click().run()
+    at.button(key="run_all_btn").click().run()
     assert not at.exception, at.exception
     body = "\n".join(t.value for t in at.markdown) + "\n".join(c.value for c in at.caption)
     if "No matches found" in body:
@@ -343,6 +343,45 @@ def test_league_day_page_runs_for_premier_league():
     assert at.dataframe, "summary table missing"
     assert at.expander, "per-match expanders missing"
     assert any("matches predicted" in c.value for c in at.caption)
+
+
+def test_day_index_splits_country_and_league():
+    import pipeline as P
+    ms = SW._parse_matches(_daily_feed())
+    idx = P.DayIndex(ms)
+    assert idx.countries() == ["England", "France"]
+    assert idx.leagues("England") == ["Championship", "Premier League"]
+    fx = idx.fixtures("England", "Premier League")
+    assert [m.id for m in fx] == ["QsyJgS7m", "Glagw7N6"]        # sorted by kick-off
+    assert idx.fixtures("France", "Premier League") == []
+    assert P.DayIndex.split("Friendly") == ("Other", "Friendly")
+
+
+@live
+def test_pick_a_match_flow_predicts_first_fixture():
+    """Fetch Today Matches -> country -> league -> match -> Predict."""
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_file("app.py", default_timeout=600)
+    at.run()
+    at.switch_page("views/league_day.py")
+    at.run()
+    at.button(key="fetch_btn").click().run()
+    assert not at.exception, at.exception
+    countries = at.selectbox(key="country_sel").options
+    assert countries, "no countries loaded from the day feed"
+    # pick the first country that has a league with at least one fixture
+    at.selectbox(key="country_sel").select(countries[0]).run()
+    leagues = at.selectbox(key="league_sel").options
+    assert leagues
+    at.selectbox(key="league_sel").select(leagues[0]).run()
+    first_match = at.selectbox(key="match_sel").options[0]       # formatted label
+    at.selectbox(key="match_sel").select(first_match).run()
+    at.button(key="predict_btn").click().run()
+    assert not at.exception, at.exception
+    assert at.title, "prediction panel missing"
+    assert " v " in at.title[0].value
+    assert len(at.metric) >= 5
 
 
 @live

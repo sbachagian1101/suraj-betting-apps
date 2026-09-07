@@ -29,13 +29,27 @@ Soccerway and Flashscore share team ids, so a Flashscore team link
 
 * **Two teams** (`views/two_teams.py`): paste two team links, get the prediction for their
   next meeting with the full breakdown.
-* **League day** (`views/league_day.py`): paste league names one per line in Flashscore's
-  wording (`ENGLAND: Premier League`), pick the day, and the app predicts every match of that
-  day in those leagues. Output is a summary table (CSV download) plus one expander per match
-  with the same breakdown as the two-team page. Only matches played *before* each fixture
-  count as its history, so finished matches are predicted pre-match and shown against the
-  actual score. Budget about 10 seconds per match; both teams are fetched in parallel and
-  team data is cached for ten minutes, so re-runs are fast.
+* **League day** (`views/league_day.py`), two tabs:
+  * **Pick a match**: press *Fetch Today Matches*, then choose country -> league -> match
+    (Home v Away) from dropdowns filled from the day's feed, and press *Predict this match*.
+    The *Keep updating* toggle re-reads the score, odds and line-ups every minute, so the
+    panel stays current up to and through kick-off.
+  * **Whole day**: paste league names one per line in Flashscore's wording
+    (`ENGLAND: Premier League`) and the app predicts every match of that day in those
+    leagues: a summary table (CSV download) plus one expander per match with the same
+    breakdown as the two-team page. Budget about 10 seconds per match.
+
+  Only matches played *before* each fixture count as its history, so finished matches are
+  predicted pre-match and shown against the actual score. Both teams are fetched in
+  parallel and team data is cached for ten minutes, so re-runs are fast.
+
+## Desktop app (Windows)
+
+The same code ships as a desktop app in `D:\01_PREDICTION MODELS\SoccerwayPredictor`:
+`run.bat` builds a private `.venv` on first run and starts the app; `SoccerwayPredictor.vbs`
+(and the desktop shortcut) open it in its own window with no console; `launcher.py` picks a
+free port and reuses a running copy. It needs the internet while open, because every
+prediction reads the Flashscore feeds live.
 
 The daily match list comes from `global.flashscore.ninja/2035/x/feed/f_1_<day offset>_<utc offset>_en-us_1`,
 which carries every match of the day with league headers and team ids.

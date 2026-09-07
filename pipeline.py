@@ -75,9 +75,42 @@ def odds_cached(event_id: str) -> Optional[dict]:
     return _cached(("odds", event_id), TTL_LIVE, lambda: SW.match_odds(event_id))
 
 
-def daily_cached(day_offset: int, tz_hours: int) -> list[SW.Match]:
-    return _cached(("daily", day_offset, tz_hours), 120,
-                   lambda: SW.daily_matches(day_offset, tz_hours))
+def daily_cached(day_offset: int, tz_hours: int, refresh: bool = False) -> list[SW.Match]:
+    key = ("daily", day_offset, tz_hours)
+    if refresh:
+        with _lock:
+            _cache.pop(key, None)
+    return _cached(key, 120, lambda: SW.daily_matches(day_offset, tz_hours))
+
+
+def latest_match(match: SW.Match, day_offset: int, tz_hours: int) -> SW.Match:
+    """The freshest copy of ``match`` from the day feed (status and score move)."""
+    for m in daily_cached(day_offset, tz_hours):
+        if m.id == match.id:
+            return m
+    return match
+
+
+@dataclass
+class DayIndex:
+    """Country -> league -> matches, built from one day feed."""
+    matches: list[SW.Match]
+
+    @staticmethod
+    def split(competition: str) -> tuple[str, str]:
+        country, _, league = competition.partition(":")
+        return (country.strip().title() if league else "Other"), (league.strip() or competition.strip())
+
+    def countries(self) -> list[str]:
+        return sorted({self.split(m.competition)[0] for m in self.matches})
+
+    def leagues(self, country: str) -> list[str]:
+        return sorted({self.split(m.competition)[1] for m in self.matches
+                       if self.split(m.competition)[0] == country})
+
+    def fixtures(self, country: str, league: str) -> list[SW.Match]:
+        out = [m for m in self.matches if self.split(m.competition) == (country, league)]
+        return sorted(out, key=lambda m: m.kickoff)
 
 
 # --------------------------------------------------------------------------- #
