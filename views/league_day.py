@@ -268,26 +268,40 @@ def board_frame(rows, now: datetime) -> pd.DataFrame:
             "Score": (f"{m.home_score}-{m.away_score}"
                       if m.stage in ("2", "3") and m.home_score is not None else ""),
         }
-        A = r.analysis
-        if A is None:
-            out.append(base | {"Selection / prediction": r.error[:40] if r.error else "…computing"})
-            continue
-        p = A.pred
-        imp = M.implied(A.odds) if A.odds else None
-        sig = M.bet_signal(p, A.odds)
+        nan = float("nan")
         every = refresh_minutes(m.kickoff, now)
-        out.append(base | {
-            "Home %": round(p.p_home * 100), "Draw %": round(p.p_draw * 100), "Away %": round(p.p_away * 100),
-            "vs book H": round((p.p_home - imp["home"]) * 100, 1) if imp else float("nan"),
-            "vs book D": round((p.p_draw - imp["draw"]) * 100, 1) if imp else float("nan"),
-            "vs book A": round((p.p_away - imp["away"]) * 100, 1) if imp else float("nan"),
-            "Selection / prediction": sig["label"] if sig else "no odds",
-            "Odds H/D/A": (f"{A.odds['home']:.2f}/{A.odds['draw']:.2f}/{A.odds['away']:.2f}"
-                           if A.odds else ""),
+        rec = base | {
+            "Home %": nan, "Draw %": nan, "Away %": nan,
+            "vs book H": nan, "vs book D": nan, "vs book A": nan,
+            "Selection / prediction": r.error[:40] if r.error else "…computing",
+            "Odds H/D/A": "",
             "Updated": r.computed_at.strftime("%H:%M") if r.computed_at else "",
             "Refresh": f"every {every} min" if every else "frozen",
-        })
-    return pd.DataFrame(out)
+        }
+        A = r.analysis
+        if A is not None:
+            p = A.pred
+            imp = M.implied(A.odds) if A.odds else None
+            sig = M.bet_signal(p, A.odds)
+            rec.update({
+                "Home %": round(p.p_home * 100), "Draw %": round(p.p_draw * 100),
+                "Away %": round(p.p_away * 100),
+                "vs book H": round((p.p_home - imp["home"]) * 100, 1) if imp else nan,
+                "vs book D": round((p.p_draw - imp["draw"]) * 100, 1) if imp else nan,
+                "vs book A": round((p.p_away - imp["away"]) * 100, 1) if imp else nan,
+                "Selection / prediction": sig["label"] if sig else "no odds",
+                "Odds H/D/A": (f"{A.odds['home']:.2f}/{A.odds['draw']:.2f}/{A.odds['away']:.2f}"
+                               if A.odds else ""),
+            })
+        out.append(rec)
+    df = pd.DataFrame(out)
+    # Streamlit's grid prints missing numbers as "None" whatever the Styler says,
+    # so hand it display strings for the numeric columns.
+    for c in ("Home %", "Draw %", "Away %"):
+        df[c] = df[c].map(lambda v: "" if pd.isna(v) else f"{v:.0f}")
+    for c in ("vs book H", "vs book D", "vs book A"):
+        df[c] = df[c].map(lambda v: "" if pd.isna(v) else f"{v:+.1f}%")
+    return df
 
 
 def style_board(df: pd.DataFrame):
@@ -301,11 +315,13 @@ def style_board(df: pd.DataFrame):
         return ""
 
     def gap_style(v):
-        if v is None or pd.isna(v):
+        try:
+            x = float(str(v).rstrip("%"))
+        except ValueError:
             return ""
-        if M.BET_MIN_EDGE * 100 <= v <= M.BET_MAX_EDGE * 100:
+        if M.BET_MIN_EDGE * 100 <= x <= M.BET_MAX_EDGE * 100:
             return "background-color: #e6ffb3;"
-        return "color: #999;" if v < 0 else ""
+        return "color: #999;" if x < 0 else ""
 
     sty = df.style.apply(row_style, axis=1)
     if "Selection / prediction" in df:
@@ -375,12 +391,7 @@ with tab_board:
             show = df.drop(columns=["id"])
             ev = st.dataframe(
                 style_board(show), hide_index=True, width="stretch", height=min(520, 60 + 36 * len(show)),
-                on_select="rerun", selection_mode="single-row", key="board_table",
-                column_config={
-                    "vs book H": st.column_config.NumberColumn(format="%+.1f%%"),
-                    "vs book D": st.column_config.NumberColumn(format="%+.1f%%"),
-                    "vs book A": st.column_config.NumberColumn(format="%+.1f%%"),
-                })
+                on_select="rerun", selection_mode="single-row", key="board_table")
             sel = ev.selection.rows if ev and ev.selection else []
             if sel:
                 st.session_state["board_sel"] = df.iloc[sel[0]]["id"]
