@@ -110,6 +110,17 @@ def ascii_fold(text: str) -> str:
     return unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode()
 
 
+def nice_name(name: str) -> str:
+    """'THAT'S ALL GOOD' -> "That's All Good"; keeps country tags like (IRE) upper."""
+    s = (name or "").strip()
+    if not s or not s.isupper():
+        return s
+    out = s.title()
+    out = re.sub(r"'([A-Z])\b", lambda m: "'" + m.group(1).lower(), out)     # That'S -> That's
+    out = re.sub(r"\(([A-Za-z]{2,3})\)", lambda m: "(" + m.group(1).upper() + ")", out)
+    return out
+
+
 def norm_name(name: str) -> str:
     """Normalise a horse or venue name for cross-source matching: fold accents,
     drop country tags like (IRE)/(FR)/(AUS), upper-case, collapse punctuation."""

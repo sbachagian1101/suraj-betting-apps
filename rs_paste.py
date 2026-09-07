@@ -18,7 +18,7 @@ from typing import Optional
 
 import rs_enhanced
 import rs_parser
-from common import CURRENCY, Entry, PastRun, RaceCard, days_between
+from common import CURRENCY, Entry, PastRun, RaceCard, days_between, nice_name
 
 BUILD = "2026-09-07c"      # bumped with every change; app.py refuses a stale copy
 
@@ -238,7 +238,7 @@ def to_card(race: rs_parser.Race, idn: Identity) -> RaceCard:
     for r in race.runners:
         sex = {"GELDING": "G", "HORSE": "H", "MARE": "M", "FILLY": "F", "COLT": "C"}.get(
             (r.sex or "").upper(), (r.sex or "")[:1].upper())
-        e = Entry(number=r.tab, name=r.name.title() if r.name.isupper() else r.name,
+        e = Entry(number=r.tab, name=nice_name(r.name),
                   barrier=r.barrier, weight=r.weight, jockey=r.jockey.title(),
                   trainer=r.trainer.title(), age=r.age, sex=sex, scratched=r.scratched,
                   form_string=r.form_string, odds=r.odds, sources=["Racing & Sports paste"])
@@ -305,7 +305,7 @@ def parse_speed_map(raw: str) -> dict[int, SpeedRow]:
             if len(nums) >= 4:
                 aes, afs = float(nums[-2]), float(nums[-1])
                 if 10.0 <= aes <= 22.0 and 10.0 <= afs <= 22.0:
-                    row = SpeedRow(tab=tab, name=m.group(2).strip().title(), aes=aes, afs=afs)
+                    row = SpeedRow(tab=tab, name=nice_name(m.group(2).strip()), aes=aes, afs=afs)
                     try:
                         row.bp = int(float(nums[-3]))
                         row.jr = float(nums[-4])
@@ -418,7 +418,7 @@ def enhanced_to_card(header: dict, runners: list[dict], idn: Identity, race_day:
         detailed = bool(r.get("recent_runs")) or r.get("jky_n") is not None
         sex = {"GELDING": "G", "HORSE": "H", "MARE": "M", "FILLY": "F", "COLT": "C"}.get(
             str(r.get("sex") or "").upper(), str(r.get("sex") or "")[:1].upper())
-        e = Entry(number=r.get("tab"), name=str(r.get("horse", "")).title(), weight=r.get("wt") or None,
+        e = Entry(number=r.get("tab"), name=nice_name(str(r.get("horse", ""))), weight=r.get("wt") or None,
                   barrier=(r.get("bp_block") or r.get("bp") or None), jockey=str(r.get("jockey") or "").title(),
                   trainer=str(r.get("trainer") or "").title(), age=r.get("age") or None, sex=sex,
                   scratched=bool(r.get("scratched")), form_string=str(r.get("form") or ""),

@@ -281,6 +281,7 @@ def test_pmu_past_runs_rebuild_margins():
 # common helpers
 # --------------------------------------------------------------------------- #
 def test_helpers():
+    assert common.nice_name("THAT'S ALL GOOD") == "That's All Good" and common.nice_name("PURPLE LION (IRE)") == "Purple Lion (IRE)"
     assert common.frac_to_decimal("7/2") == 4.5 and common.frac_to_decimal("EVS") == 2.0
     assert common.frac_to_decimal("8/10F") == 1.8 and common.frac_to_decimal("SP") is None
     assert common.imperial_to_m("6f 12y") == 1218 and common.imperial_to_m("1m 2f") == 2012
