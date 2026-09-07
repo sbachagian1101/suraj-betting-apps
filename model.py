@@ -27,6 +27,7 @@ from typing import Optional
 
 from soccerway import MatchRecord, Player
 
+BUILD = "2026-09-07.12-5"  # bumped on every change; app.py refuses to run against an older copy
 LEAGUE_AVG = 1.45          # goals per team per game (top-flight Europe)
 PRIOR_GAMES = 2.0          # shrinkage weight in "games"
 DECAY = 0.85               # recency weight: match k back counts DECAY**k

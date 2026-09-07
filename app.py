@@ -30,6 +30,7 @@ _NEEDED = {
     "board": ["BOARD", "refresh_minutes", "Board"],
     "charts": ["model_vs_book", "outcome_pie", "score_heatmap", "xg_history", "rating_bars"],
 }
+EXPECTED_MODEL_BUILD = "2026-09-07.12-5"   # must equal model.BUILD; bump both together
 _missing = []
 for _mod, _names in _NEEDED.items():
     try:
@@ -38,6 +39,8 @@ for _mod, _names in _NEEDED.items():
         _missing.append(f"{_mod} (import failed: {_exc})")
         continue
     _missing += [f"{_mod}.{n}" for n in _names if not hasattr(_m, n)]
+    if _mod == "model" and getattr(_m, "BUILD", None) != EXPECTED_MODEL_BUILD:
+        _missing.append(f"model.BUILD {getattr(_m, 'BUILD', None)!r} != {EXPECTED_MODEL_BUILD!r}")
 if _missing:
     st.error("**This deployment is running stale code.** Missing: `" + "`, `".join(_missing)
              + "`. Streamlit Cloud pulled the new files but kept an old module in memory. "
