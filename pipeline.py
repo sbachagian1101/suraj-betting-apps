@@ -96,9 +96,14 @@ def gather(idn: rs_paste.Identity, paste_card: RaceCard, timeout: float = 75.0,
                 if progress:
                     progress(f"{m.NAME}: {len(card.field_)} runners")
             except SourceError as exc:
-                status.append(SourceStatus(m.NAME, False, str(exc), time.time() - t0))
+                msg = str(exc)
+                if m is betfair and "403" in msg:
+                    msg = ("Betfair blocks requests from Streamlit Cloud's servers (403). Exchange "
+                           "prices are available when the app runs on your own PC; the other feeds "
+                           "still supply bookmaker prices where they cover the race.")
+                status.append(SourceStatus(m.NAME, False, msg, time.time() - t0))
                 if progress:
-                    progress(f"{m.NAME}: {exc}")
+                    progress(f"{m.NAME}: {msg}")
             except Exception as exc:  # noqa: BLE001 - a layout change must not kill the page
                 status.append(SourceStatus(m.NAME, False, f"{type(exc).__name__}: {exc}", time.time() - t0))
                 if progress:

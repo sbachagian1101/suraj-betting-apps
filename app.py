@@ -164,7 +164,8 @@ bits = [x for x in (card.name, f"{card.dist_m}m" if card.dist_m else "", card.su
                     card.going.title() if card.going else "", card.race_class,
                     f"{card.currency} {card.prize:,.0f}" if card.prize else "",
                     card.race_date.strftime("%a %d %b %Y") if card.race_date else "",
-                    f"{card.start_time} local" if card.start_time else "", card.weather, card.rail) if x]
+                    f"{card.start_time} local" if card.start_time else "", card.weather.title() if card.weather else "",
+                    f"Rail: {card.rail}" if card.rail else "") if x]
 st.markdown(" · ".join(bits))
 ok = [s for s in A.status if s.ok]
 bad = [s for s in A.status if not s.ok]
