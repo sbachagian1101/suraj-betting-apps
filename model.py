@@ -27,7 +27,7 @@ from typing import Optional
 
 from soccerway import MatchRecord, Player
 
-BUILD = "2026-09-07.12-5"  # bumped on every change; app.py refuses to run against an older copy
+BUILD = "2026-09-07.bet50-1"  # bumped on every change; app.py refuses to run against an older copy
 LEAGUE_AVG = 1.45          # goals per team per game (top-flight Europe)
 PRIOR_GAMES = 2.0          # shrinkage weight in "games"
 DECAY = 0.85               # recency weight: match k back counts DECAY**k
@@ -272,33 +272,32 @@ def implied(odds: dict) -> Optional[dict]:
 # Bet signal
 # --------------------------------------------------------------------------- #
 BET_MIN_PROB = 0.50        # the model must make that side more likely than not
-BET_MIN_EDGE = 0.05        # model minus book, in probability points
-BET_MAX_EDGE = 0.20        # above this the model is more likely wrong than the book
+BET_MIN_EDGE = 0.01        # and beat the book's implied probability by more than this
 BET_LABELS = {"home": "BET HOME TEAM", "draw": "BET DRAW", "away": "BET AWAY TEAM"}
 
 
 def bet_signal(pred: "Prediction", odds: Optional[dict]) -> Optional[dict]:
-    """The side with the biggest model-over-book gap, flagged as a bet only when
-    the model puts that side above BET_MIN_PROB *and* the gap sits inside
-    [BET_MIN_EDGE, BET_MAX_EDGE]. None without odds. ``reasons`` lists what
-    failed when it is not a bet."""
+    """User's rule: a side is a bet when the model puts it above BET_MIN_PROB
+    and its model-minus-book gap is above BET_MIN_EDGE. At most one side can be
+    above 50%, so at most one bet. None without odds. When it is not a bet,
+    ``side`` is the side with the biggest gap and ``reasons`` says why."""
     imp = implied(odds) if odds else None
     if not imp:
         return None
-    gaps = {"home": pred.p_home - imp["home"], "draw": pred.p_draw - imp["draw"],
-            "away": pred.p_away - imp["away"]}
-    side, gap = max(gaps.items(), key=lambda kv: kv[1])
-    prob = getattr(pred, "p_" + side)
+    probs = {"home": pred.p_home, "draw": pred.p_draw, "away": pred.p_away}
+    gaps = {k: probs[k] - imp[k] for k in probs}
+    fav = max(probs, key=probs.get)
     reasons = []
-    if prob <= BET_MIN_PROB:
-        reasons.append(f"model {prob:.0%} is not above {BET_MIN_PROB:.0%}")
-    if gap < BET_MIN_EDGE:
-        reasons.append(f"gap {gap:+.1%} is below {BET_MIN_EDGE:.0%}")
-    elif gap > BET_MAX_EDGE:
-        reasons.append(f"gap {gap:+.1%} is above {BET_MAX_EDGE:.0%}")
+    if probs[fav] > BET_MIN_PROB:
+        side = fav
+        if gaps[side] <= BET_MIN_EDGE + 1e-9:          # exactly +1.0 is not "above"
+            reasons.append(f"gap {gaps[side]:+.1%} is not above {BET_MIN_EDGE:+.1%}")
+    else:
+        side = max(gaps, key=gaps.get)
+        reasons.append(f"no side above {BET_MIN_PROB:.0%} (best {fav} {probs[fav]:.0%})")
     bet = not reasons
-    return dict(side=side, gap=gap, bet=bet, label=BET_LABELS[side] if bet else "NO BET",
-                model=prob, book=imp[side], odds=odds.get(side), reasons=reasons)
+    return dict(side=side, gap=gaps[side], bet=bet, label=BET_LABELS[side] if bet else "NO BET",
+                model=probs[side], book=imp[side], odds=odds.get(side), reasons=reasons)
 
 
 # --------------------------------------------------------------------------- #

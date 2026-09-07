@@ -125,9 +125,9 @@ def bet_banner(A: Analysis):
             f'margin-bottom:0.6rem">{detail}</div>',
             unsafe_allow_html=True)
     else:
-        st.caption(f"**NO BET** · biggest gap is {detail}: " + "; ".join(sig["reasons"]) +
-                   f". A bet needs the model above {M.BET_MIN_PROB:.0%} on that side and a gap "
-                   f"between {M.BET_MIN_EDGE:.0%} and {M.BET_MAX_EDGE:.0%}.")
+        st.caption(f"**NO BET** · {detail}: " + "; ".join(sig["reasons"]) +
+                   f". A bet needs the model above {M.BET_MIN_PROB:.0%} on a side and that side's "
+                   f"gap above {M.BET_MIN_EDGE:+.1%} versus the book.")
 
 
 def insights_list(A: Analysis):

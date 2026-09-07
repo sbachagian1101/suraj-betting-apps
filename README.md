@@ -70,11 +70,13 @@ Soccerway and Flashscore share team ids, so a Flashscore team link
 ## Bet signal
 
 Under the prediction row a black-on-lime banner says **BET HOME TEAM**, **BET DRAW** or
-**BET AWAY TEAM** when, for the side with the biggest model-over-book gap, both hold:
-the model puts that side **above 50%**, and the gap between the model and the book's implied
-probability (margin removed) is **between 5.0 and 20.0 points**. Gaps above 20 points are
-treated as the model being wrong rather than the book. Anything else shows **NO BET** with the
-reasons. The whole-day table and the live board carry the same signal in their selection column.
+**BET AWAY TEAM** when a side is **above 50%** in the model and its gap over the book's implied
+probability (margin removed) is **above +1.0 point**. At most one side can be above 50%, so
+there is at most one bet. Anything else shows **NO BET** with the reason. The whole-day table
+and the live board carry the same signal in their selection column; on the board the Home /
+Draw / Away % cells above 50 and the positive vs-book cells are lime, and two columns after
+the selection show each XI's average rating over the line-up window with its gap to the team
+average, e.g. `6.37 (-0.03)` (a trailing `~` means the probable XI from the last match).
 
 ## Desktop app (Windows)
 

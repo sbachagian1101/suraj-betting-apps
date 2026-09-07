@@ -92,6 +92,15 @@ def starts_in(m: SW.Match, now: datetime) -> str:
     return f"{mn}m {sc:02d}s"
 
 
+def xi_text(la) -> str:
+    """'6.37 (-0.03)': the XI's average rating over the line-up window and its gap
+    to the team average; blank when there is no rated line-up."""
+    if la is None or la.lineup_rating is None:
+        return ""
+    tag = "" if la.source == "today" else " ~"          # ~ = probable XI from the last match
+    return f"{la.lineup_rating:.2f} ({la.gap:+.2f}){tag}"
+
+
 def board_frame(rows, now: datetime) -> pd.DataFrame:
     out = []
     for r in rows:
@@ -111,6 +120,7 @@ def board_frame(rows, now: datetime) -> pd.DataFrame:
             "Home %": nan, "Draw %": nan, "Away %": nan,
             "vs book H": nan, "vs book D": nan, "vs book A": nan,
             "Selection / prediction": r.error[:40] if r.error else "…computing",
+            "Home XI (last N)": "", "Away XI (last N)": "",
             "Odds H": nan, "Odds D": nan, "Odds A": nan,
             "Updated": r.computed_at.strftime("%H:%M") if r.computed_at else "",
             "Refresh": f"every {every} min" if every else "frozen",
@@ -127,6 +137,8 @@ def board_frame(rows, now: datetime) -> pd.DataFrame:
                 "vs book D": round((p.p_draw - imp["draw"]) * 100, 1) if imp else nan,
                 "vs book A": round((p.p_away - imp["away"]) * 100, 1) if imp else nan,
                 "Selection / prediction": sig["label"] if sig else "no odds",
+                "Home XI (last N)": xi_text(A.la_h),
+                "Away XI (last N)": xi_text(A.la_a),
                 "Odds H": A.odds["home"] if A.odds else nan,
                 "Odds D": A.odds["draw"] if A.odds else nan,
                 "Odds A": A.odds["away"] if A.odds else nan,
@@ -162,17 +174,24 @@ def style_board(df: pd.DataFrame, blink_ids: set[str], blink_on: bool, started_i
             return "background-color: #c6ff00; color: #000; font-weight: 800;"
         return ""
 
+    def pct_style(v):
+        try:
+            return "background-color: #c6ff00; color: #000;" if float(v) > M.BET_MIN_PROB * 100 else ""
+        except ValueError:
+            return ""
+
     def gap_style(v):
         try:
             x = float(str(v).rstrip("%"))
         except ValueError:
             return ""
-        if M.BET_MIN_EDGE * 100 <= x <= M.BET_MAX_EDGE * 100:
-            return "background-color: #e6ffb3;"
+        if x > 0:
+            return "background-color: #c6ff00; color: #000;"
         return "color: #999;" if x < 0 else ""
 
     sty = df.style.apply(row_style, axis=1)
     sty = sty.map(pred_style, subset=["Selection / prediction"])
+    sty = sty.map(pct_style, subset=["Home %", "Draw %", "Away %"])
     sty = sty.map(gap_style, subset=["vs book H", "vs book D", "vs book A"])
     sty = sty.map(alerts.odds_colour, subset=["Odds H", "Odds D", "Odds A"])
     return sty

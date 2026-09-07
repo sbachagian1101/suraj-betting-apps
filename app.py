@@ -22,7 +22,7 @@ _NEEDED = {
               "recency_weights", "LineupAssessment", "TeamProfile",
               "XG_WEIGHT", "LEAGUE_AVG", "PRIOR_GAMES", "HOME_ADV", "AWAY_ADV",
               "RATING_K", "RATING_K_OPP", "MAX_GOALS", "DECAY", "N_RATES", "N_LINEUP",
-              "bet_signal", "BET_MIN_EDGE", "BET_MAX_EDGE", "BET_MIN_PROB"],
+              "bet_signal", "BET_MIN_EDGE", "BET_MIN_PROB"],
     "pipeline": ["analyse_pair", "analyse_fixture", "daily_cached", "latest_match",
                  "on_day", "DayIndex", "Analysis"],
     "ui": ["render_full", "render_compact", "bet_banner", "prediction_row", "insights_list",
@@ -32,7 +32,7 @@ _NEEDED = {
     "board_ui": ["render", "board_frame", "style_board", "starts_in"],
     "charts": ["model_vs_book", "outcome_pie", "score_heatmap", "xg_history", "rating_bars"],
 }
-EXPECTED_MODEL_BUILD = "2026-09-07.12-5"   # must equal model.BUILD; bump both together
+EXPECTED_MODEL_BUILD = "2026-09-07.bet50-1"   # must equal model.BUILD; bump both together
 _missing = []
 for _mod, _names in _NEEDED.items():
     try:

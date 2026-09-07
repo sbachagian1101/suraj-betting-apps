@@ -293,29 +293,36 @@ def _odds_with_gap(pred, side, gap):
     return {k: 1 / v for k, v in imp.items()}
 
 
-def test_bet_signal_needs_majority_and_band():
+def test_bet_signal_majority_side_with_positive_gap():
     strong = M.profile("A", _records("a", [2.6] * 3, [0.6] * 3, [{"p": 7.2}] * 3))
     weak = M.profile("B", _records("b", [0.7] * 3, [2.0] * 3, [{"p": 6.3}] * 3))
     pred = M.predict(strong, weak)
     assert pred.p_home > M.BET_MIN_PROB                 # home favourite well above 50%
     assert M.bet_signal(pred, None) is None
-    sig = M.bet_signal(pred, _odds_with_gap(pred, "home", 0.10))
-    assert sig["side"] == "home" and sig["bet"] and sig["label"] == "BET HOME TEAM"
-    assert sig["reasons"] == []
-    # gap outside the band -> NO BET even with the majority
-    sig = M.bet_signal(pred, _odds_with_gap(pred, "home", 0.30))
-    assert not sig["bet"] and any("above" in r for r in sig["reasons"])
-    sig = M.bet_signal(pred, _odds_with_gap(pred, "home", 0.02))
-    assert not sig["bet"] and any("below" in r for r in sig["reasons"])
-    # the away side has a gap in band but the model gives it well under 50% -> NO BET
+    # gap above +1.0 point -> bet, however large the gap
+    for gap in (0.02, 0.10, 0.30):
+        sig = M.bet_signal(pred, _odds_with_gap(pred, "home", gap))
+        assert sig["side"] == "home" and sig["bet"] and sig["label"] == "BET HOME TEAM", gap
+        assert sig["reasons"] == []
+    # gap of exactly +1.0 or less -> NO BET
+    sig = M.bet_signal(pred, _odds_with_gap(pred, "home", 0.01))
+    assert not sig["bet"] and any("not above +1.0%" in r for r in sig["reasons"])
+    sig = M.bet_signal(pred, _odds_with_gap(pred, "home", -0.05))
+    assert not sig["bet"]
+    # the away side has a big positive gap but the model gives it well under 50%:
+    # the favourite is home, and home's gap is negative here -> NO BET, judged on home
     sig = M.bet_signal(pred, _odds_with_gap(pred, "away", 0.10))
-    assert sig["side"] == "away" and not sig["bet"] and sig["label"] == "NO BET"
-    assert any("not above 50%" in r for r in sig["reasons"])
+    assert sig["side"] == "home" and not sig["bet"] and sig["label"] == "NO BET"
     # an even match: nobody above 50%, so never a bet whatever the gap
     even = M.predict(M.profile("A", _records("a", [1.5] * 3, [1.2] * 3, [{"p": 6.8}] * 3)),
                      M.profile("B", _records("b", [1.5] * 3, [1.2] * 3, [{"p": 6.8}] * 3)))
     assert max(even.p_home, even.p_draw, even.p_away) < M.BET_MIN_PROB
-    assert not M.bet_signal(even, _odds_with_gap(even, "home", 0.10))["bet"]
+    sig = M.bet_signal(even, _odds_with_gap(even, "home", 0.10))
+    assert not sig["bet"] and any("no side above 50%" in r for r in sig["reasons"])
+    # away favourite -> BET AWAY TEAM
+    pred_a = M.predict(weak, strong)
+    assert pred_a.p_away > M.BET_MIN_PROB
+    assert M.bet_signal(pred_a, _odds_with_gap(pred_a, "away", 0.05))["label"] == "BET AWAY TEAM"
 
 
 def test_insights_mention_form_and_book():
@@ -589,6 +596,18 @@ def test_board_frame_and_styler_layer_colours():
     rows = [B.Row(match=m1, analysis=A, computed_at=now), B.Row(match=m2)]
     df = BU.board_frame(rows, now)
     assert list(df["Odds H"]) == ["1.85", ""] and df.iloc[0]["Home %"] != ""
+    cols = list(df.columns)
+    assert cols.index("Home XI (last N)") == cols.index("Selection / prediction") + 1
+    assert cols.index("Away XI (last N)") == cols.index("Odds H") - 1
+    assert list(df["Home XI (last N)"]) == ["", ""]        # no line-up assessment in this fixture
+    # the XI text: rating, gap, and a ~ when it is the probable XI from the last match
+    la = M.assess_lineup([_player(f"p{i}", None) for i in range(11)], "last match", "4-3-3",
+                         M.profile("H", _records("h", [1.5] * 3, [1.0] * 3,
+                                                  [{f"p{i}": 6.4 for i in range(11)}] * 3)))
+    assert BU.xi_text(la) == "6.40 (+0.00) ~"
+    la.source = "today"
+    assert BU.xi_text(la) == "6.40 (+0.00)"
+    assert BU.xi_text(None) == ""
     assert BU.starts_in(m1, now).endswith("s") and BU.starts_in(m2, now) == "LIVE"
     sty = BU.style_board(df, blink_ids={m1.id}, blink_on=True, started_ids={m2.id})
     html = sty.to_html()
