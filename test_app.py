@@ -486,6 +486,63 @@ def test_charts_build_from_an_analysis():
     assert C.rating_bars(A) is None
 
 
+def test_alerts_imminent_started_and_beep():
+    import alerts as AL
+    from datetime import timedelta as td
+    now = datetime(2026, 9, 7, 12, 0, tzinfo=timezone.utc)
+    soon = _match(1, "h", "a", None, None); soon.stage = "1"; soon.kickoff = now + td(minutes=4)
+    later = _match(2, "h", "a", None, None); later.stage = "1"; later.kickoff = now + td(minutes=6)
+    gone = _match(3, "h", "a", 0, 0); gone.stage = "1"; gone.kickoff = now - td(minutes=1)
+    live = _match(4, "h", "a", 1, 0); live.stage = "2"; live.kickoff = now - td(minutes=20)
+    assert AL.imminent(soon, now) and not AL.imminent(later, now)
+    assert not AL.imminent(gone, now) and not AL.imminent(live, now)
+    assert AL.started(live, now) and AL.started(gone, now) and not AL.started(soon, now)
+    # announce once: second call with the id recorded returns nothing
+    seen: set[str] = set()
+    first = AL.new_alerts([soon, later, live], now, seen)
+    assert [m.id for m in first] == [soon.id]
+    seen.update(m.id for m in first)
+    assert AL.new_alerts([soon, later, live], now, seen) == []
+    wav = AL.beep_wav()
+    assert wav[:4] == b"RIFF" and wav[8:12] == b"WAVE" and len(wav) > 10000
+    assert AL.odds_colour("1.85").startswith("background-color: " + AL.ODDS_GREEN)
+    assert AL.odds_colour("2.50").startswith("background-color: " + AL.ODDS_YELLOW)
+    assert AL.odds_colour("3.60").startswith("background-color: " + AL.ODDS_BLUE)
+    assert AL.odds_colour("") == "" and AL.odds_colour(None) == ""
+
+
+def test_board_frame_and_styler_layer_colours():
+    import alerts as AL
+    import board as B
+    import board_ui as BU
+    import pipeline as P
+    from datetime import timedelta as td
+    now = datetime(2026, 9, 7, 12, 0, tzinfo=timezone.utc)
+    m1 = _match(1, "h", "a", None, None); m1.stage = "1"; m1.kickoff = now + td(minutes=3)
+    m2 = _match(2, "h2", "a2", 1, 0); m2.stage = "2"; m2.kickoff = now - td(minutes=30)
+    a = M.profile("H", _records("h", [1.5] * 3, [1.0] * 3, [{"p": 7.0}] * 3))
+    b = M.profile("A", _records("a", [1.2] * 3, [1.3] * 3, [{"p": 6.8}] * 3))
+    odds = {"home": 1.85, "draw": 3.4, "away": 4.2, "home_open": 1.9, "draw_open": 3.4, "away_open": 4.0}
+    A = P.Analysis(m1, P.TeamData("h", "h", "H", a.records), P.TeamData("a", "a", "A", b.records),
+                   a, b, None, None, M.predict(a, b), odds, 3, 3)
+    rows = [B.Row(match=m1, analysis=A, computed_at=now), B.Row(match=m2)]
+    df = BU.board_frame(rows, now)
+    assert list(df["Odds H"]) == ["1.85", ""] and df.iloc[0]["Home %"] != ""
+    assert BU.starts_in(m1, now).endswith("s") and BU.starts_in(m2, now) == "LIVE"
+    sty = BU.style_board(df, blink_ids={m1.id}, blink_on=True, started_ids={m2.id})
+    html = sty.to_html()
+    assert AL.PURPLE in html and AL.ROSE in html          # row colours present
+    assert AL.ODDS_GREEN in html and AL.ODDS_BLUE in html  # odds cell colours present
+    # on the blinking row, the odds cell's own colour is declared after the row colour, so it wins
+    computed = sty._compute()
+    odds_col = list(df.columns).index("Odds H")
+    bg = [v for k, v in computed.ctx[(0, odds_col)] if k.strip() == "background-color"]
+    assert bg and bg[-1].strip() == AL.ODDS_GREEN
+    # blink off: the imminent row has no row colour, the started row keeps rose
+    off = BU.style_board(df, blink_ids={m1.id}, blink_on=False, started_ids={m2.id}).to_html()
+    assert AL.PURPLE not in off and AL.ROSE in off
+
+
 def test_day_index_splits_country_and_league():
     import pipeline as P
     ms = SW._parse_matches(_daily_feed())

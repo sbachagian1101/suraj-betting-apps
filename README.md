@@ -47,9 +47,15 @@ Soccerway and Flashscore share team ids, so a Flashscore team link
     Home/Draw/Away %, the three model-minus-book gaps and the selection; it redraws every
     30 s. Click a row for charts (model v book bars, 1X2 pie, scoreline heatmap, recent xG
     history, XI ratings) and the insights. The worker lives in `board.py`, charts in
-    `charts.py` (plotly). The **Only matches with odds** toggle (on by default) hides
-    unpriced matches; the filter is applied when the table redraws, so a match appears by
-    itself once the book prices it on a later refresh.
+    `charts.py` (plotly), the tab itself in `board_ui.py`. The **Only matches with odds**
+    toggle (on by default) hides unpriced matches; the filter is applied when the table
+    redraws, so a match appears by itself once the book prices it on a later refresh.
+    **Kick-off alerts** (`alerts.py`): when a listed match comes within 5 minutes of
+    kick-off the bell beeps once (a short WAV via `st.audio(autoplay=True)`), a bell banner
+    names the match, and its row blinks pale purple (the table redraws once a second and
+    alternates the row colour) until it starts; started and finished rows are rose. The
+    odds cells keep their own colours on top of the row colour: green under 2.0, yellow
+    under 3.0, pale blue at 3.0 and above.
 
   Only matches played *before* each fixture count as its history, so finished matches are
   predicted pre-match and shown against the actual score. Both teams are fetched in

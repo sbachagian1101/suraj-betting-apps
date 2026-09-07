@@ -28,6 +28,8 @@ _NEEDED = {
     "ui": ["render_full", "render_compact", "bet_banner", "prediction_row", "insights_list",
            "team_panel", "methodology"],
     "board": ["BOARD", "refresh_minutes", "Board"],
+    "alerts": ["imminent", "started", "new_alerts", "beep_wav", "odds_colour", "PURPLE", "ROSE"],
+    "board_ui": ["render", "board_frame", "style_board", "starts_in"],
     "charts": ["model_vs_book", "outcome_pie", "score_heatmap", "xg_history", "rating_bars"],
 }
 EXPECTED_MODEL_BUILD = "2026-09-07.12-5"   # must equal model.BUILD; bump both together

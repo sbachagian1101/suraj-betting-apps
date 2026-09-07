@@ -1,0 +1,283 @@
+"""Live board tab: tiered auto-refresh table with kick-off alerts and click-through charts.
+
+Rendered by views/league_day.py inside its "Live board" tab. Kept in its own
+module so the pieces (frame builder, styler, alerts) are importable and testable.
+"""
+from __future__ import annotations
+
+import time
+from datetime import datetime, timezone
+
+import pandas as pd
+import streamlit as st
+
+import alerts
+import charts
+import model as M
+import soccerway as SW
+import ui
+from board import BOARD, refresh_minutes
+from pipeline import DayIndex
+
+DEFAULT_LEAGUES = "ENGLAND: Premier League\nFRANCE: Ligue 1\nGERMANY: Bundesliga"
+FAST_REDRAW = "1s"        # while a match is within 5 minutes: alternate colours = blink
+SLOW_REDRAW = "30s"
+
+
+def starts_in(m: SW.Match, now: datetime) -> str:
+    if m.stage == "3":
+        return "FT"
+    if m.stage == "2":
+        return "LIVE"
+    secs = (m.kickoff - now).total_seconds()
+    if secs <= 0:
+        return "kicking off"
+    h, rem = divmod(int(secs), 3600)
+    mn, sc = divmod(rem, 60)
+    if h:
+        return f"{h}h {mn:02d}m"
+    if mn >= 5:
+        return f"{mn}m"
+    return f"{mn}m {sc:02d}s"
+
+
+def board_frame(rows, now: datetime) -> pd.DataFrame:
+    out = []
+    for r in rows:
+        m = r.match
+        country, league = DayIndex.split(m.competition)
+        nan = float("nan")
+        every = refresh_minutes(m.kickoff, now)
+        rec = {
+            "id": m.id,
+            "Start (UTC)": m.kickoff.strftime("%H:%M"),
+            "Start (MU)": SW.fmt_mu(m.kickoff),
+            "Starts in": starts_in(m, now),
+            "Country": country, "League": league,
+            "Match": f"{m.home_name} v {m.away_name}",
+            "Score": (f"{m.home_score}-{m.away_score}"
+                      if m.stage in ("2", "3") and m.home_score is not None else ""),
+            "Home %": nan, "Draw %": nan, "Away %": nan,
+            "vs book H": nan, "vs book D": nan, "vs book A": nan,
+            "Selection / prediction": r.error[:40] if r.error else "…computing",
+            "Odds H": nan, "Odds D": nan, "Odds A": nan,
+            "Updated": r.computed_at.strftime("%H:%M") if r.computed_at else "",
+            "Refresh": f"every {every} min" if every else "frozen",
+        }
+        A = r.analysis
+        if A is not None:
+            p = A.pred
+            imp = M.implied(A.odds) if A.odds else None
+            sig = M.bet_signal(p, A.odds)
+            rec.update({
+                "Home %": round(p.p_home * 100), "Draw %": round(p.p_draw * 100),
+                "Away %": round(p.p_away * 100),
+                "vs book H": round((p.p_home - imp["home"]) * 100, 1) if imp else nan,
+                "vs book D": round((p.p_draw - imp["draw"]) * 100, 1) if imp else nan,
+                "vs book A": round((p.p_away - imp["away"]) * 100, 1) if imp else nan,
+                "Selection / prediction": sig["label"] if sig else "no odds",
+                "Odds H": A.odds["home"] if A.odds else nan,
+                "Odds D": A.odds["draw"] if A.odds else nan,
+                "Odds A": A.odds["away"] if A.odds else nan,
+            })
+        out.append(rec)
+    df = pd.DataFrame(out)
+    # Streamlit's grid prints missing numbers as "None" whatever the Styler says,
+    # so hand it display strings for the numeric columns.
+    for c in ("Home %", "Draw %", "Away %"):
+        df[c] = df[c].map(lambda v: "" if pd.isna(v) else f"{v:.0f}")
+    for c in ("vs book H", "vs book D", "vs book A"):
+        df[c] = df[c].map(lambda v: "" if pd.isna(v) else f"{v:+.1f}%")
+    for c in ("Odds H", "Odds D", "Odds A"):
+        df[c] = df[c].map(lambda v: "" if pd.isna(v) else f"{v:.2f}")
+    return df
+
+
+def style_board(df: pd.DataFrame, blink_ids: set[str], blink_on: bool, started_ids: set[str]):
+    """Row colour first (rose for started, purple on alternate redraws for imminent),
+    then the cell colours for gaps, odds and the selection, which sit on top."""
+    def row_style(row):
+        rid = row.get("id")
+        if rid in started_ids:
+            css = f"background-color: {alerts.ROSE};"
+        elif rid in blink_ids and blink_on:
+            css = f"background-color: {alerts.PURPLE};"
+        else:
+            css = ""
+        return [css] * len(row)
+
+    def pred_style(v):
+        if isinstance(v, str) and v.startswith("BET "):
+            return "background-color: #c6ff00; color: #000; font-weight: 800;"
+        return ""
+
+    def gap_style(v):
+        try:
+            x = float(str(v).rstrip("%"))
+        except ValueError:
+            return ""
+        if M.BET_MIN_EDGE * 100 <= x <= M.BET_MAX_EDGE * 100:
+            return "background-color: #e6ffb3;"
+        return "color: #999;" if x < 0 else ""
+
+    sty = df.style.apply(row_style, axis=1)
+    sty = sty.map(pred_style, subset=["Selection / prediction"])
+    sty = sty.map(gap_style, subset=["vs book H", "vs book D", "vs book A"])
+    sty = sty.map(alerts.odds_colour, subset=["Odds H", "Odds D", "Odds A"])
+    return sty
+
+
+BELL_CSS = """
+<style>
+@keyframes swbell { 0%,100% { transform: rotate(0); } 25% { transform: rotate(18deg); } 75% { transform: rotate(-18deg); } }
+.sw-bell { display:inline-block; font-size:1.6rem; animation: swbell 0.8s infinite; transform-origin: top center; }
+.sw-bell-box { background:#e9d5ff; border-radius:0.5rem; padding:0.4rem 0.8rem; font-weight:700; }
+</style>
+"""
+
+
+def render(D, n_rates: int, n_lineup: int) -> None:
+    if not D:
+        st.markdown("Press **Fetch Today Matches** on the *Pick a match* tab first, then choose the "
+                    "leagues to keep on the board.")
+        return
+    idx: DayIndex = D["index"]
+    all_leagues = sorted({m.competition for m in idx.matches})
+    upcoming = {m.competition for m in idx.matches if m.stage == "1"}
+    typed = SW.select_leagues(DEFAULT_LEAGUES.splitlines(), idx.matches, strict=True)[0].values()
+    default = [l for l in dict.fromkeys(typed) if l in upcoming]
+    if not default:
+        skip = ("U19", "U20", "U21", "U23", "Women", "Amateur", "Reserve", "Youth", "Regional",
+                "Group", "Division 2", "Division 3", "Liga 2", "Liga 3", " B", " C", "Torneo")
+        default = [l for l in all_leagues if l in upcoming and not any(k in l for k in skip)][:5]
+    c1, c2, c3 = st.columns([3, 1, 1])
+    chosen_leagues = c1.multiselect(
+        "Leagues on the board", all_leagues, default=default, key="board_leagues",
+        help="Every scheduled match of the day in these leagues is tracked.")
+    horizon = c2.slider("Only matches within (hours)", 1, 24, 24, key="board_horizon")
+    only_odds = c2.toggle("Only matches with odds", value=True, key="board_only_odds",
+                          help="Hides matches the book has not priced. They appear "
+                               "automatically once odds turn up on a refresh.")
+    start = c3.button("Start / update board", type="primary", width="stretch", key="board_start")
+    stop = c3.button("Stop board", width="stretch", key="board_stop")
+    st.caption("Refresh: every 60 min beyond 3 h from kick-off, 30 min within 3 h, 15 min within "
+               "1 h, 5 min within 30 min. Started matches are frozen; score and status keep "
+               "updating every 5 min. The table redraws every 30 s, and once a second while a "
+               "match is inside 5 minutes of kick-off: its row blinks purple and the bell beeps "
+               "once; started matches turn rose. Click a row for the charts.")
+    if start:
+        now = datetime.now(timezone.utc)
+        picked = [m for m in idx.matches if m.competition in set(chosen_leagues)
+                  and m.stage == "1" and 0 <= (m.kickoff - now).total_seconds() <= horizon * 3600]
+        if not picked:
+            st.warning("No scheduled matches in those leagues inside that horizon.")
+        else:
+            BOARD.configure(picked, n_rates, n_lineup, D["offset"], D["tz"])
+    if stop:
+        BOARD.stop()
+
+    st.session_state.setdefault("board_notified", set())
+    now0 = datetime.now(timezone.utc)
+    fast = any(alerts.imminent(r.match, now0) for r in BOARD.snapshot())
+    st.session_state["board_fast"] = fast
+
+    @st.fragment(run_every=FAST_REDRAW if fast else SLOW_REDRAW)
+    def board_table():
+        now = datetime.now(timezone.utc)
+        rows = BOARD.snapshot()
+        S = BOARD.status()
+        if not rows:
+            st.info("The board is empty. Pick leagues and press **Start / update board**.")
+            return
+        priced = [r for r in rows if r.analysis is not None and r.analysis.odds]
+        shown = priced if only_odds else rows
+        shown_matches = [r.match for r in shown]
+        imminent_ids = {m.id for m in shown_matches if alerts.imminent(m, now)}
+        started_ids = {m.id for m in shown_matches if alerts.started(m, now)}
+        # switch the redraw cadence when the first match enters (or the last leaves) the window
+        if bool(imminent_ids) != st.session_state.get("board_fast", False):
+            st.session_state["board_fast"] = bool(imminent_ids)
+            st.rerun(scope="app")
+
+        fresh = alerts.new_alerts(shown_matches, now, st.session_state["board_notified"])
+        if fresh:
+            st.session_state["board_notified"].update(m.id for m in fresh)
+            st.audio(alerts.beep_wav(), format="audio/wav", autoplay=True)
+        if imminent_ids:
+            names = ", ".join(f"{m.home_name} v {m.away_name} ({starts_in(m, now)})"
+                              for m in shown_matches if m.id in imminent_ids)
+            st.markdown(BELL_CSS + f'<div class="sw-bell-box"><span class="sw-bell">🔔</span> '
+                        f'Kick-off within 5 minutes: {names}</div>', unsafe_allow_html=True)
+
+        m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
+        m1.metric("Matches", S["total"])
+        m2.metric("Predicted", S["computed"])
+        m3.metric("With odds", len(priced))
+        m4.metric("Imminent", len(imminent_ids))
+        m5.metric("Errors", S["errors"])
+        m6.metric("Worker", "running" if S["running"] else "stopped")
+        nxt = S["next_due"]
+        m7.metric("Next refresh", f"in {max(0, int((nxt - now).total_seconds() // 60))} min" if nxt else "—")
+        if S["busy_with"]:
+            st.caption(f"Computing {S['busy_with']}…")
+        if not shown:
+            st.info("No priced matches yet. Unpriced ones stay hidden while the toggle is on "
+                    "and appear as soon as the book prices them.")
+            return
+        df = board_frame(shown, now)
+        blink_on = int(time.time()) % 2 == 0
+        ev = st.dataframe(
+            style_board(df, imminent_ids, blink_on, started_ids), hide_index=True, width="stretch",
+            height=min(520, 60 + 36 * len(df)),
+            on_select="rerun", selection_mode="single-row", key="board_table",
+            column_config={"id": None})
+        sel = ev.selection.rows if ev and ev.selection else []
+        if sel:
+            new_id = df.iloc[sel[0]]["id"]
+            if st.session_state.get("board_sel") != new_id:
+                st.session_state["board_sel"] = new_id
+                st.rerun(scope="app")
+
+    @st.fragment(run_every=SLOW_REDRAW)
+    def board_detail():
+        now = datetime.now(timezone.utc)
+        chosen_id = st.session_state.get("board_sel")
+        r = BOARD.row(chosen_id) if chosen_id else None
+        if r is None:
+            st.caption("Select a row to see the charts and insights for that match.")
+            return
+        st.divider()
+        if r.analysis is None:
+            st.info(f"{r.match.home_name} v {r.match.away_name}: not computed yet"
+                    + (f" ({r.error})" if r.error else "."))
+            return
+        A = r.analysis
+        st.subheader(f"{A.title} · {starts_in(r.match, now)}")
+        ui.prediction_row(A)
+        ui.bet_banner(A)
+        g1, g2 = st.columns(2)
+        g1.plotly_chart(charts.model_vs_book(A), width="stretch")
+        g2.plotly_chart(charts.outcome_pie(A), width="stretch")
+        g3, g4 = st.columns(2)
+        g3.plotly_chart(charts.score_heatmap(A), width="stretch")
+        g4.plotly_chart(charts.xg_history(A), width="stretch")
+        rb = charts.rating_bars(A)
+        if rb is not None:
+            st.plotly_chart(rb, width="stretch")
+        t1, t2, t3 = st.tabs(["Insights", "Teams & line-ups", "Method"])
+        with t1:
+            ui.insights_list(A)
+        with t2:
+            l, rr = st.columns(2)
+            with l:
+                ui.team_panel(A.prof_h, A.la_h, "Home")
+            with rr:
+                ui.team_panel(A.prof_a, A.la_a, "Away")
+        with t3:
+            ui.methodology(A)
+        with st.expander("Worker log"):
+            for line in BOARD.status()["log"]:
+                st.text(line)
+
+    board_table()
+    board_detail()
