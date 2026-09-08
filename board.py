@@ -23,11 +23,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
 
 import soccerway as SW
-from pipeline import Analysis, analyse_fixture, daily_cached
+from pipeline import Analysis, analyse_fixture, daily_cached, sweep_odds
 
 TIERS = [(30, 5), (60, 15), (180, 30)]      # (minutes to kick-off <=, refresh every minutes)
 BEYOND_MINUTES = 60
 LIST_REFRESH = 300                          # seconds between day-feed status refreshes
+RESWEEP = 1800                              # seconds between odds re-checks of skipped matches
 LOOP_SLEEP = 5
 
 
@@ -67,17 +68,23 @@ class Board:
     running: bool = False
     busy_with: str = ""
     last_list_refresh: Optional[datetime] = None
+    candidates: dict[str, SW.Match] = field(default_factory=dict)   # skipped: no odds yet
+    last_resweep: Optional[datetime] = None
     log: list[str] = field(default_factory=list)
     _lock: threading.Lock = field(default_factory=threading.Lock)
     _thread: Optional[threading.Thread] = None
 
     # ------------------------------------------------------------------ control
     def configure(self, matches: list[SW.Match], n_rates: int, n_lineup: int,
-                  day_offset: int, tz_hours: int) -> None:
+                  day_offset: int, tz_hours: int,
+                  candidates: Optional[list[SW.Match]] = None) -> None:
         """Set the matches to track. Existing predictions for the same ids are kept
-        unless the windows changed."""
+        unless the windows changed. ``candidates`` are matches skipped for having
+        no odds; they are re-checked every RESWEEP seconds and promoted when priced."""
         now = datetime.now(timezone.utc)
         with self._lock:
+            self.candidates = {m.id: m for m in (candidates or [])}
+            self.last_resweep = now
             reset = (n_rates, n_lineup) != (self.n_rates, self.n_lineup)
             self.n_rates, self.n_lineup = n_rates, n_lineup
             self.day_offset, self.tz_hours = day_offset, tz_hours
@@ -136,6 +143,7 @@ class Board:
                 computed=sum(1 for r in rows if r.analysis is not None),
                 errors=sum(1 for r in rows if r.error),
                 busy_with=self.busy_with,
+                skipped=len(self.candidates),
                 next_due=min((r.next_due for r in rows if r.next_due and not r.started), default=None),
                 last_list_refresh=self.last_list_refresh,
                 log=list(self.log[-8:]),
@@ -169,6 +177,28 @@ class Board:
                     r.match = latest[r.match.id]
             self.last_list_refresh = now
 
+    def _resweep(self, now: datetime) -> None:
+        """Re-check odds for the skipped matches; promote the newly priced ones."""
+        with self._lock:
+            cands = [m for m in self.candidates.values() if m.stage == "1" and m.kickoff > now]
+            self.last_resweep = now
+        if not cands:
+            return
+        try:
+            odds = sweep_odds(cands)
+        except Exception as exc:                                   # noqa: BLE001
+            self._log(f"odds re-check failed: {exc}")
+            return
+        promoted = [m for m in cands if odds.get(m.id)]
+        with self._lock:
+            for m in promoted:
+                self.candidates.pop(m.id, None)
+                if m.id not in self.rows:
+                    self.rows[m.id] = Row(match=m, next_due=now)
+            if promoted:
+                self.rows = dict(sorted(self.rows.items(), key=lambda kv: kv[1].match.kickoff))
+                self._log(f"odds appeared for {len(promoted)} skipped match(es); added to the board")
+
     def _loop(self) -> None:
         while True:
             with self._lock:
@@ -177,6 +207,9 @@ class Board:
             now = datetime.now(timezone.utc)
             if self.last_list_refresh is None or (now - self.last_list_refresh).total_seconds() >= LIST_REFRESH:
                 self._refresh_list(now)
+            if self.candidates and (self.last_resweep is None
+                                    or (now - self.last_resweep).total_seconds() >= RESWEEP):
+                self._resweep(now)
             row = self._due(now)
             if row is None:
                 time.sleep(LOOP_SLEEP)

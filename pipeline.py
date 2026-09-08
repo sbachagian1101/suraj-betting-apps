@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -81,6 +81,40 @@ def daily_cached(day_offset: int, tz_hours: int, refresh: bool = False) -> list[
         with _lock:
             _cache.pop(key, None)
     return _cached(key, 120, lambda: SW.daily_matches(day_offset, tz_hours))
+
+
+def sweep_odds(matches: list[SW.Match], workers: int = 8,
+               progress: Optional[Callable[[int, int], None]] = None) -> dict[str, Optional[dict]]:
+    """One cheap odds request per match, in parallel: {match id: odds or None}.
+
+    Used to decide which matches are worth computing at all. A few hundred
+    matches take a handful of seconds with 8 workers."""
+    out: dict[str, Optional[dict]] = {}
+    if not matches:
+        return out
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futures = {ex.submit(odds_cached, m.id): m.id for m in matches}
+        done = 0
+        for fut in as_completed(futures):
+            mid = futures[fut]
+            try:
+                out[mid] = fut.result()
+            except Exception:                                   # noqa: BLE001
+                out[mid] = None
+            done += 1
+            if progress:
+                progress(done, len(matches))
+    return out
+
+
+def priced_matches(matches: list[SW.Match], workers: int = 8,
+                   progress: Optional[Callable[[int, int], None]] = None
+                   ) -> tuple[list[SW.Match], list[SW.Match]]:
+    """Split matches into (priced, unpriced) by sweeping the odds feed."""
+    odds = sweep_odds(matches, workers, progress)
+    priced = [m for m in matches if odds.get(m.id)]
+    unpriced = [m for m in matches if not odds.get(m.id)]
+    return priced, unpriced
 
 
 def on_day(matches: list[SW.Match], day, tz_hours: int) -> list[SW.Match]:

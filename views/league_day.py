@@ -16,7 +16,7 @@ import board_ui
 import model as M
 import soccerway as SW
 import ui
-from pipeline import DayIndex, analyse_fixture, daily_cached, latest_match, on_day
+from pipeline import DayIndex, analyse_fixture, daily_cached, latest_match, on_day, priced_matches
 
 DEFAULT_LEAGUES = "ENGLAND: Premier League\nFRANCE: Ligue 1\nGERMANY: Bundesliga"
 STATUS_OPTIONS = ["Scheduled", "Live", "Finished"]
@@ -62,21 +62,31 @@ with tab_pick:
                "Change the day or offset in the sidebar, then fetch again.")
     if fetch:
         try:
-            ms = on_day(daily_cached(offset, tz, refresh=True), day, tz)
+            all_ms = on_day(daily_cached(offset, tz, refresh=True), day, tz)
         except SW.SoccerwayError as exc:
             st.error(str(exc))
             st.stop()
-        st.session_state["day_index"] = dict(index=DayIndex(ms), day=day, offset=offset, tz=tz,
-                                             fetched=datetime.now(timezone.utc))
+        # Odds sweep first: only matches the book has priced are kept anywhere in
+        # the app. One cheap request per match, in parallel.
+        bar = st.progress(0.0, text=f"Checking odds for {len(all_ms)} matches…")
+        priced, unpriced = priced_matches(
+            all_ms, progress=lambda d, n: bar.progress(d / n, text=f"Checking odds: {d} of {n} matches"))
+        bar.empty()
+        st.session_state["day_index"] = dict(index=DayIndex(priced), day=day, offset=offset, tz=tz,
+                                             fetched=datetime.now(timezone.utc),
+                                             unpriced=unpriced, total=len(all_ms))
         st.session_state.pop("picked", None)
 
     D = st.session_state.get("day_index")
     if not D:
         st.markdown("Press **Fetch Today Matches** to load the day's fixtures, then pick "
-                    "country, league and match from the dropdowns.")
+                    "country, league and match from the dropdowns. Matches the book has not "
+                    "priced are skipped entirely.")
     else:
         idx: DayIndex = D["index"]
-        st.caption(f"{len(idx.matches)} matches in {len(idx.countries())} countries, fetched "
+        st.caption(f"{D.get('total', len(idx.matches))} matches on the feed, "
+                   f"**{len(idx.matches)} with odds** in {len(idx.countries())} countries "
+                   f"({len(D.get('unpriced', []))} without odds skipped), fetched "
                    f"{D['fetched'].strftime('%H:%M:%S')} UTC for {D['day'].strftime('%a %d %b')}.")
         countries = idx.countries()
         d1, d2, d3 = st.columns([1, 1.4, 2.2])
@@ -152,8 +162,15 @@ with tab_all:
         wanted = set(found.values())
         matches = [m for m in all_matches if m.competition in wanted and m.status in statuses]
         matches.sort(key=lambda m: (m.competition, m.kickoff))
+        # skip anything the book has not priced: no time spent computing it
+        bar = st.progress(0.0, text=f"Checking odds for {len(matches)} matches…")
+        matches, skipped = priced_matches(
+            matches, progress=lambda d, n: bar.progress(d / n, text=f"Checking odds: {d} of {n}"))
+        bar.empty()
+        if skipped:
+            st.caption(f"{len(skipped)} matches without odds skipped.")
         if not matches:
-            st.info("No matches found for those leagues on that day with the chosen statuses.")
+            st.info("No priced matches found for those leagues on that day with the chosen statuses.")
             st.stop()
         st.markdown("Matched leagues: " + ", ".join(f"**{v}**" for v in dict.fromkeys(found.values())))
 

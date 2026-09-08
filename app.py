@@ -24,7 +24,7 @@ _NEEDED = {
               "RATING_K", "RATING_K_OPP", "MAX_GOALS", "DECAY", "N_RATES", "N_LINEUP",
               "bet_signal", "BET_MIN_EDGE", "BET_MIN_PROB"],
     "pipeline": ["analyse_pair", "analyse_fixture", "daily_cached", "latest_match",
-                 "on_day", "DayIndex", "Analysis"],
+                 "on_day", "sweep_odds", "priced_matches", "DayIndex", "Analysis"],
     "ui": ["render_full", "render_compact", "bet_banner", "prediction_row", "insights_list",
            "team_panel", "methodology"],
     "board": ["BOARD", "refresh_minutes", "Board"],

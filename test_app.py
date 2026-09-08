@@ -401,9 +401,10 @@ def test_league_day_page_runs_for_premier_league():
     at.text_area[0].set_value("ENGLAND: Premier League").run()
     at.button(key="run_all_btn").click().run()
     assert not at.exception, at.exception
-    body = "\n".join(t.value for t in at.markdown) + "\n".join(c.value for c in at.caption)
-    if "No matches found" in body:
-        pytest.skip("no Premier League matches today")
+    body = ("\n".join(t.value for t in at.markdown) + "\n".join(c.value for c in at.caption)
+            + "\n".join(i.value for i in at.info))
+    if "No matches found" in body or "No priced matches" in body:
+        pytest.skip("no priced Premier League matches today")
     assert at.dataframe, "summary table missing"
     assert at.expander, "per-match expanders missing"
     assert any("matches predicted" in c.value for c in at.caption)
@@ -480,6 +481,65 @@ def test_board_computes_due_rows_with_fake_compute(monkeypatch):
     bd2.stop()
     assert bd2.status()["computed"] == len(fin) == 1
     assert all(r.next_due is None for r in bd2.snapshot())
+
+
+def test_odds_sweep_splits_priced_from_unpriced(monkeypatch):
+    import pipeline as P
+    ms = SW._parse_matches(_daily_feed())
+    priced_ids = {ms[0].id, ms[2].id}
+    calls = []
+
+    def fake_odds(event_id):
+        calls.append(event_id)
+        if event_id == ms[3].id:
+            raise RuntimeError("feed hiccup")              # an error counts as unpriced
+        return {"home": 2.0, "draw": 3.3, "away": 3.5} if event_id in priced_ids else None
+
+    monkeypatch.setattr(P, "odds_cached", fake_odds)
+    seen = []
+    priced, unpriced = P.priced_matches(ms, workers=3, progress=lambda d, n: seen.append((d, n)))
+    assert {m.id for m in priced} == priced_ids
+    assert {m.id for m in unpriced} == {ms[1].id, ms[3].id}
+    assert sorted(calls) == sorted(m.id for m in ms)         # one request per match
+    assert seen[-1] == (4, 4) and [d for d, _ in seen] == [1, 2, 3, 4]
+    assert P.priced_matches([]) == ([], [])
+
+
+def test_board_promotes_skipped_matches_once_priced(monkeypatch):
+    import time as _t
+    import board as B
+    import pipeline as P
+    from datetime import timedelta as td
+    now = datetime.now(timezone.utc)
+    ms = SW._parse_matches(_daily_feed())
+    for m in ms:
+        m.stage, m.kickoff = "1", now + td(hours=2)
+    on_board, skipped = ms[:1], ms[1:3]
+    calls = []
+
+    def fake_compute(m, n_rates, n_lineup):
+        calls.append(m.id)
+        a = M.profile(m.home_name, _records("h", [1.5] * 3, [1.0] * 3, [{"p": 7.0}] * 3))
+        b = M.profile(m.away_name, _records("a", [1.2] * 3, [1.3] * 3, [{"p": 6.8}] * 3))
+        return P.Analysis(m, P.TeamData("h", m.home_id, m.home_name, a.records),
+                          P.TeamData("a", m.away_id, m.away_name, b.records),
+                          a, b, None, None, M.predict(a, b), None, n_rates, n_lineup)
+
+    priced_now = {skipped[0].id}
+    monkeypatch.setattr(B, "daily_cached", lambda *a, **k: [])
+    monkeypatch.setattr(B, "sweep_odds", lambda cands, *a, **k: {m.id: ({"home": 2.0} if m.id in priced_now else None) for m in cands})
+    monkeypatch.setattr(B, "LOOP_SLEEP", 0.05)
+    monkeypatch.setattr(B, "RESWEEP", 0.2)
+    bd = B.Board(compute=fake_compute)
+    bd.configure(on_board, 8, 4, 0, 4, candidates=skipped)
+    assert bd.status()["skipped"] == 2 and bd.status()["total"] == 1
+    deadline = _t.time() + 10
+    while _t.time() < deadline and bd.status()["computed"] < 2:
+        _t.sleep(0.1)
+    bd.stop()
+    S = bd.status()
+    assert S["total"] == 2 and S["computed"] == 2 and S["skipped"] == 1   # one promoted, one still skipped
+    assert sorted(calls) == sorted([on_board[0].id, skipped[0].id])     # the unpriced one never computed
 
 
 def test_time_window_uses_mauritius_hours():

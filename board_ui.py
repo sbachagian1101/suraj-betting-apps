@@ -238,10 +238,17 @@ def render(D, n_rates: int, n_lineup: int) -> None:
     if start:
         now = datetime.now(timezone.utc)
         picked = select_board_matches(idx.matches, set(chosen_leagues), horizon, now)
-        if not picked:
+        # matches skipped at fetch time for having no odds: never computed, never shown,
+        # but re-checked every 30 min and promoted if the book prices them
+        skipped = select_board_matches(D.get("unpriced", []), set(chosen_leagues), horizon, now)
+        if not picked and not skipped:
             st.warning("No matches in those leagues inside that horizon.")
+        elif not picked:
+            st.warning(f"None of the {len(skipped)} matches in those leagues has odds yet. "
+                       "They are re-checked every 30 minutes and appear once priced.")
+            BOARD.configure([], n_rates, n_lineup, D["offset"], D["tz"], candidates=skipped)
         else:
-            BOARD.configure(picked, n_rates, n_lineup, D["offset"], D["tz"])
+            BOARD.configure(picked, n_rates, n_lineup, D["offset"], D["tz"], candidates=skipped)
     if stop:
         BOARD.stop()
 
@@ -296,7 +303,9 @@ def render(D, n_rates: int, n_lineup: int) -> None:
         st.progress(done / total if total else 0.0,
                     text=f"{done} out of {total} matches computed ({done / total:.0%})"
                          + (f" · computing {S['busy_with']}…" if S["busy_with"] else
-                            (" · all done, refreshing on schedule" if done >= total else "")))
+                            (" · all done, refreshing on schedule" if done >= total else ""))
+                         + (f" · {S['skipped']} without odds skipped, re-checked every 30 min"
+                            if S.get("skipped") else ""))
         if not shown:
             st.info("Nothing to show with the current filters: the odds toggle, the leagues "
                     "shown and the time window in the sidebar. Unpriced matches appear as "

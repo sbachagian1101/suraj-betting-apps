@@ -30,6 +30,11 @@ Soccerway and Flashscore share team ids, so a Flashscore team link
 * **Two teams** (`views/two_teams.py`): paste two team links, get the prediction for their
   next meeting with the full breakdown.
 * **League day** (`views/league_day.py`), two tabs:
+  *Fetch Today Matches* first sweeps the odds feed for every match of the day (one cheap
+  request each, eight in parallel, a few seconds for a few hundred matches) and keeps only
+  the matches the book has priced. Unpriced matches are skipped everywhere: never computed,
+  never listed. The live board re-checks the skipped ones every 30 minutes and adds any that
+  have since been priced.
   * **Pick a match**: press *Fetch Today Matches*, then choose country -> league -> match
     (Home v Away) from dropdowns filled from the day's feed, and press *Predict this match*.
     The *Keep updating* toggle re-reads the score, odds and line-ups every minute, so the
