@@ -1,0 +1,11 @@
+# Add inside the existing HTTPS server only after reviewing its real config.
+# Choose a free local port; 8517 is a proposed value, not a verified free port.
+location /formlab/ {
+    proxy_pass http://127.0.0.1:8517;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 86400;
+}
