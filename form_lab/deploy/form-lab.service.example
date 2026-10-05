@@ -1,0 +1,23 @@
+[Unit]
+Description=Separate Form Lab research dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=formlab
+Group=formlab
+WorkingDirectory=/opt/form-lab
+Environment=FORM_LAB_MODELS=/var/lib/form-lab/models
+Environment=FORM_LAB_CARDS=/var/lib/form-lab/cards.jsonl
+Environment=FORM_LAB_HISTORY=/var/lib/form-lab/history.jsonl
+ExecStart=/opt/form-lab/.venv/bin/python -m streamlit run form_lab/app.py --server.address=127.0.0.1 --server.port=8517 --server.baseUrlPath=formlab --server.headless=true --browser.gatherUsageStats=false
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/form-lab
+
+[Install]
+WantedBy=multi-user.target
